@@ -1,0 +1,2 @@
+# DMECoreData
+CoreData library
