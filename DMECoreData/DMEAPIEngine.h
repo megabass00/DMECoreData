@@ -12,7 +12,7 @@ typedef void (^FetchObjectsCompletionBlock)(NSArray *objects, NSError *error);
 typedef void (^OperationObjectCompletionBlock)(NSDictionary *object, NSError *error);
 typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 
-@interface GETAPIEngine : AFHTTPSessionManager
+@interface DMEAPIEngine : AFHTTPSessionManager
 
 @property (nonatomic) NSInteger haveConection;
 

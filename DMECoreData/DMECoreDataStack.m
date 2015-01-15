@@ -7,7 +7,7 @@
 
 #import "DMECoreData.h"
 
-@interface CoreDataStack ()
+@interface DMECoreDataStack ()
 @property (strong, nonatomic, readonly) NSManagedObjectContext *privateContext;
 @property (strong, nonatomic, readonly) NSManagedObjectModel *model;
 @property (strong, nonatomic, readonly) NSPersistentStoreCoordinator *storeCoordinator;
@@ -17,8 +17,67 @@
 
 @end
 
-@implementation CoreDataStack
+@implementation DMECoreDataStack
 
+static DMECoreDataStack *sharedInstance = nil;
+
+#pragma mark - Singleton
+
++(instancetype)sharedInstance {
+    if(sharedInstance){
+        return sharedInstance;
+    }
+    else{
+        NSLog(@"Debes inicializar el CoreDataStack antes de usarlo");
+    }
+}
+
+#pragma mark - Init Methods
+
++(instancetype) coreDataStackWithModelName:(NSString *)aModelName databaseFilename:(NSString*) aDBName{
+    if(sharedInstance == nil){
+        NSURL *url = nil;
+        
+        if (aDBName) {
+            url = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:aDBName];
+        }
+        else{
+            url = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:aModelName];
+        }
+        
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            sharedInstance = [DMECoreDataStack coreDataStackWithModelName:aModelName databaseURL:url];
+        });
+        
+        return sharedInstance;
+    }
+    else{
+        NSLog(@"El CoreDataStack ya ha sido inicializado con anterioridad");
+        
+        return nil;
+    }
+}
+
++(instancetype) coreDataStackWithModelName:(NSString *)aModelName{
+    return [DMECoreDataStack coreDataStackWithModelName:aModelName databaseFilename:nil];
+}
+
++(instancetype) coreDataStackWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL{
+    if(sharedInstance == nil){
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            sharedInstance = [[DMECoreDataStack alloc] initWithModelName: aModelName databaseURL:aDBURL];
+        });
+        
+        return sharedInstance;
+    }
+    else{
+        NSLog(@"El CoreDataStack ya ha sido inicializado con anterioridad");
+        
+        return nil;
+    }
+}
 
 #pragma mark -  Properties
 // When using a readonly property with a custom getter, auto-synthesize
@@ -27,7 +86,7 @@
 // (in Spanish)
 @synthesize model=_model;
 @synthesize storeCoordinator=_storeCoordinator;
-@synthesize context=_context;
+@synthesize mainContext=_mainContext;
 @synthesize backgroundContext=_backgroundContext;
 @synthesize privateContext=_privateContext;
 
@@ -47,15 +106,15 @@
 
 -(NSManagedObjectContext *)context{
     //Creamos un solo contexto para el hilo actual
-    if (_context == nil){
-        _context = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-        _context.parentContext = [self privateContext];
-        _context.undoManager = nil;
-        _privateContext.retainsRegisteredObjects = NO;
-        [_context setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
+    if (_mainContext == nil){
+        _mainContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        _mainContext.parentContext = [self privateContext];
+        _mainContext.undoManager = nil;
+        _mainContext.retainsRegisteredObjects = NO;
+        [_mainContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
-    return _context;
+    return _mainContext;
 }
 
 -(NSManagedObjectContext *)backgroundContext{
@@ -64,9 +123,9 @@
         
         //Creamos de nuevo el contexto background
         _backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-        _backgroundContext.parentContext = [self context];
+        _backgroundContext.parentContext = [self mainContext];
         _backgroundContext.undoManager = nil;
-        _privateContext.retainsRegisteredObjects = NO;
+        _backgroundContext.retainsRegisteredObjects = NO;
         [_backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
@@ -93,7 +152,7 @@
             // Something went really wrong...
             // Send a notification and return nil
             NSNotification *note = [NSNotification
-                                    notificationWithName:[CoreDataStack persistentStoreCoordinatorErrorNotificationName]
+                                    notificationWithName:[DMECoreDataStack persistentStoreCoordinatorErrorNotificationName]
                                     object:self
                                     userInfo:@{@"error" : err}];
             [[NSNotificationCenter defaultCenter] postNotification:note];
@@ -115,6 +174,7 @@
 
 
 #pragma mark - Class Methods
+
 +(NSString *) persistentStoreCoordinatorErrorNotificationName{
     return @"persistentStoreCoordinatorErrorNotificationName";
 }
@@ -123,33 +183,6 @@
 + (NSURL *)applicationDocumentsDirectory
 {
     return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
-}
-
-+(CoreDataStack *) coreDataStackWithModelName:(NSString *)aModelName
-                             databaseFilename:(NSString*) aDBName{
-    
-    NSURL *url = nil;
-    
-    if (aDBName) {
-        url = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:aDBName];
-    }else{
-        url = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:aModelName];
-    }
-    
-    return [self coreDataStackWithModelName:aModelName
-                                databaseURL:url];
-}
-
-+(CoreDataStack *) coreDataStackWithModelName:(NSString *)aModelName{
-    
-    return [self coreDataStackWithModelName:aModelName
-                           databaseFilename:nil];
-}
-
-+(CoreDataStack *) coreDataStackWithModelName:(NSString *)aModelName
-                                  databaseURL:(NSURL*) aDBURL{
-    return [[self alloc] initWithModelName: aModelName databaseURL:aDBURL];
-    
 }
 
 #pragma mark - Init
@@ -194,7 +227,7 @@
     
     
     _backgroundContext = nil;
-    _context = nil;
+    _mainContext = nil;
     _privateContext = nil;
     _storeCoordinator = nil;
     [self privateContext];
@@ -203,38 +236,17 @@
     
 }
 
--(void)resetStack {
-    [_backgroundContext performBlockAndWait:^{
-        [_backgroundContext reset];
-    }];
-    
-    [_context performBlockAndWait:^{
-        [_context reset];
-    }];
-    
-    _backgroundContext = nil;
-    _context = nil;
-    _storeCoordinator = nil;
-    _model = nil;
-    
-    [self model];
-    [self storeCoordinator];
-    [self context]; // this will rebuild the stack
-    [self backgroundContext]; // this will rebuild the stack
-}
-
-
 -(void) saveWithErrorBlock: (void(^)(NSError *error))errorBlock{
     
     //Guardamos el contexto principal de la interfaz
-    [self.context performBlockAndWait:^{
+    [self.mainContext performBlockAndWait:^{
         NSError *err = nil;
         
         // If a context is nil, saving it should also be considered an
         // error, as being nil might be the result of a previous error
         // while creating the db.
-        if (!_context) {
-            err = [NSError errorWithDomain:@"CoreDataStack"
+        if (!_mainContext) {
+            err = [NSError errorWithDomain:@"DMECoreDataStack"
                                       code:1
                                   userInfo:@{NSLocalizedDescriptionKey :
                                                  @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
@@ -251,11 +263,11 @@
     
     
     //Guardamos el contexto que escribe en disco
-    [_privateContext performBlock:^{
+    [self.privateContext performBlock:^{
         NSError *err = nil;
         
         if (!_privateContext) {
-            err = [NSError errorWithDomain:@"CoreDataStack"
+            err = [NSError errorWithDomain:@"DMECoreDataStack"
                                       code:1
                                   userInfo:@{NSLocalizedDescriptionKey :
                                                  @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no private context - probably there was an earlier error trying to access the CoreData database file."}];
@@ -266,7 +278,6 @@
             if (![self.privateContext save:&err]) {
                 errorBlock(err);
             }
-            
             //DDLogInfo(@"---- Context saved into disk ----");
         }
     }];

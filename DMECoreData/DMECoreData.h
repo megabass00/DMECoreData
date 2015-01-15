@@ -32,10 +32,10 @@
 #import "NSManagedObjectContext+ModelOperations.h"
 #import "NSPredicate+Fields.h"
 
-#import "CoreDataStack.h"
-#import "GETAPIEngine.h"
+#import "DMECoreDataStack.h"
+#import "DMEAPIEngine.h"
 #import "DMEThumbnailer.h"
-#import "GETSyncEngine.h"
+#import "DMESyncEngine.h"
 
 extern NSInteger const TimeoutInterval;
 extern NSInteger const MaxConcurrentDownload;

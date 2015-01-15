@@ -17,7 +17,7 @@ typedef void (^RecieveObjectsCompletionBlock)();
 typedef void (^SendObjectsCompletionBlock)();
 typedef void (^DownloadCompletionBlock)();
 
-@interface GETSyncEngine (){
+@interface DMESyncEngine (){
     NSPredicate *idPredicateTemplate;
     NSPredicate *syncStatusPredicateTemplate;
     NSPredicate *syncStatusNotPredicateTemplate;
@@ -50,13 +50,13 @@ typedef void (^DownloadCompletionBlock)();
 
 @end
 
-@implementation GETSyncEngine
+@implementation DMESyncEngine
 
 + (instancetype)sharedEngine {
-    static GETSyncEngine *sharedEngine = nil;
+    static DMESyncEngine *sharedEngine = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        sharedEngine = [[GETSyncEngine alloc] init];
+        sharedEngine = [[DMESyncEngine alloc] init];
         sharedEngine.downloadFiles = NO;
         sharedEngine.downloadOptionalFiles = NO;
         sharedEngine.autoSyncDelay = 180;
@@ -165,7 +165,7 @@ typedef void (^DownloadCompletionBlock)();
 
 - (void)checkStartConditionsNeedInstall:(BOOL)needInstall completionBlock:(void (^)())completionBlock
 {
-    self.context = self.model.backgroundContext;
+    self.context = [DMECoreDataStack sharedInstance].backgroundContext;
     
     [self.context performBlock:^{
         if(!self.initialSyncComplete && needInstall){
@@ -358,8 +358,8 @@ typedef void (^DownloadCompletionBlock)();
     _syncInProgress = YES;
     [self didChangeValueForKey:@"syncInProgress"];
     
-    [self.model.context performBlockAndWait:^{
-        [self.model saveWithErrorBlock:^(NSError *error) {
+    [[DMECoreDataStack sharedInstance].mainContext performBlockAndWait:^{
+        [[DMECoreDataStack sharedInstance] saveWithErrorBlock:^(NSError *error) {
             [self logError:@"Error when save main context: %@",error];
         }];
     }];
@@ -650,8 +650,11 @@ typedef void (^DownloadCompletionBlock)();
     [fetchRequest setIncludesSubentities:NO];
     [fetchRequest setPredicate:[[self syncStatusPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:syncStatus]}]];
     [fetchRequest setReturnsObjectsAsFaults:YES];
-    NSError *error = nil;
-    results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    
+    [self.context performBlockAndWait:^{
+        NSError *error = nil;
+        results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    }];
     
     return results;
 }
@@ -666,8 +669,13 @@ typedef void (^DownloadCompletionBlock)();
         [fetchRequest setPredicate:predicate];
     }
     
-    NSError *error = nil;
-    return [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    __block NSArray *objects = nil;
+    [self.context performBlockAndWait:^{
+        NSError *error = nil;
+        objects = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    }];
+    
+    return objects;
 }
 
 - (NSArray *)managedObjectsForClass:(NSString *)className {
@@ -683,9 +691,14 @@ typedef void (^DownloadCompletionBlock)();
     [fetchRequest setReturnsObjectsAsFaults:YES];
     [fetchRequest setFetchLimit:1];
     [fetchRequest setPredicate:[[self idPredicateTemplate] predicateWithSubstitutionVariables:@{@"ID": aId}]];
-    NSError *error = nil;
     
-    return [[managedObjectContext executeFetchRequest:fetchRequest error:&error] lastObject];
+    __block NSManagedObject *object = nil;
+    [self.context performBlockAndWait:^{
+        NSError *error = nil;
+        object = [[managedObjectContext executeFetchRequest:fetchRequest error:&error] lastObject];
+    }];
+    
+    return object;
 }
 
 //Obtiene los objetos Core Data de un tipo que esten en el array de ids
@@ -708,8 +721,11 @@ typedef void (^DownloadCompletionBlock)();
     [fetchRequest setPredicate:andPredicate];
     [fetchRequest setReturnsObjectsAsFaults:YES];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
-    NSError *error = nil;
-    results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    
+    [self.context performBlockAndWait:^{
+        NSError *error = nil;
+        results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    }];
     
     return results;
 }
@@ -741,7 +757,7 @@ typedef void (^DownloadCompletionBlock)();
         }
         
         if(result){
-            [self.model saveWithErrorBlock:^(NSError *error) {
+            [[DMECoreDataStack sharedInstance] saveWithErrorBlock:^(NSError *error) {
                 [self logError:@"Error when save main context: %@", error];
                 result = NO;
             }];
@@ -800,7 +816,7 @@ typedef void (^DownloadCompletionBlock)();
     [self.context performBlock:^{
         [self messageBlock:NSLocalizedString(@"Descargando información de sincronización...", nil) important:YES];
         
-        [[GETAPIEngine sharedInstance] fetchEntitiesForSync:^(NSArray *objects, NSError *error) {
+        [[DMEAPIEngine sharedInstance] fetchEntitiesForSync:^(NSArray *objects, NSError *error) {
             [self progressBlockIncrementInMainProcess:YES];
             
             [self.context performBlock:^{
@@ -873,7 +889,7 @@ typedef void (^DownloadCompletionBlock)();
             [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargando información de %@...", nil), [self logClassName:className]] important:NO];
             
             //Obtenemos los objetos de la clase
-            [[GETAPIEngine sharedInstance] fetchObjectsForClass:className withParameters:nil onCompletion:^(NSArray *objects, NSError *error) {
+            [[DMEAPIEngine sharedInstance] fetchObjectsForClass:className withParameters:nil onCompletion:^(NSArray *objects, NSError *error) {
                 [self progressBlockIncrementInMainProcess:NO];
                 
                 [self.context performBlock:^{
@@ -1080,7 +1096,7 @@ typedef void (^DownloadCompletionBlock)();
             if(result){
                 //Send syncstate remove order
                 if(self.classesToSync.count > 0 && self.initialSyncComplete){
-                    [[GETAPIEngine sharedInstance] pushEntitiesSynchronized:self.classesToSync onCompletion:^(NSDictionary *object, NSError *error) {
+                    [[DMEAPIEngine sharedInstance] pushEntitiesSynchronized:self.classesToSync onCompletion:^(NSDictionary *object, NSError *error) {
                         [self.context performBlock:^{
                             if(!error){
                                 [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
@@ -1157,7 +1173,7 @@ typedef void (^DownloadCompletionBlock)();
                         // Enter the group for each request we create
                         dispatch_group_enter(groupGeneral);
                         
-                        [[GETAPIEngine sharedInstance] pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                        [[DMEAPIEngine sharedInstance] pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
                             [self.context performBlock:^{
                                 if(!error){
                                     if(object.count > 0){
@@ -1300,7 +1316,7 @@ typedef void (^DownloadCompletionBlock)();
                         // Enter the group for each request we create
                         dispatch_group_enter(groupGeneral);
                         
-                        [[GETAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                        [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
                             [self.context performBlock:^{
                                 if(!error){
                                     if(object.count > 0){
@@ -1422,7 +1438,7 @@ typedef void (^DownloadCompletionBlock)();
                         // Enter the group for each request we create
                         dispatch_group_enter(groupGeneral);
                         
-                        [[GETAPIEngine sharedInstance] deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
+                        [[DMEAPIEngine sharedInstance] deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
                             [self.context performBlock:^{
                                 if(!error && object.count > 0 && [object valueForKey:@"id"]){
                                     //Delete object in Core Data

@@ -8,15 +8,20 @@
 
 #import "DMECoreData.h"
 
-@implementation GETAPIEngine
+@implementation DMEAPIEngine
 
 + (instancetype)sharedInstance {
-    static GETAPIEngine *_sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        // Initialize the session
-        _sharedInstance = [[GETAPIEngine alloc] initWithBaseURL:[NSURL URLWithString:URLAPI]];
-    });
+    static DMEAPIEngine *_sharedInstance = nil;
+    if(URLAPI && ![URLAPI isEqualToString:@""]){
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            // Initialize the session
+            _sharedInstance = [[DMEAPIEngine alloc] initWithBaseURL:[NSURL URLWithString:URLAPI]];
+        });
+    }
+    else{
+        NSLog(@"No se ha definido una URL para el API, defina la constante URLAPI.");
+    }
     
     return _sharedInstance;
 }

@@ -6,7 +6,7 @@
 //  Copyright (c) 2013 get-app. All rights reserved.
 //
 
-#import "CoreDataStack.h"
+#import "DMECoreDataStack.h"
 
 typedef NS_ENUM(NSUInteger, ObjectSyncStatus) {
     ObjectSynced = 0,
@@ -49,10 +49,9 @@ typedef void (^ErrorBlock)(NSError *error, BOOL fatal);
 typedef void (^ProgressBlock)(CGFloat current, CGFloat total);
 typedef void (^MessageBlock)(NSString *message, BOOL important);
 
-@interface GETSyncEngine : NSObject
+@interface DMESyncEngine : NSObject
 
 @property (atomic, readonly) BOOL syncInProgress;   //Indica si la sincronización esta ya en curso
-@property (strong, nonatomic) CoreDataStack *model;
 @property (assign, nonatomic) NSInteger autoSyncDelay;
 @property (assign, nonatomic) BOOL downloadFiles;
 @property (assign, nonatomic) BOOL downloadOptionalFiles;
