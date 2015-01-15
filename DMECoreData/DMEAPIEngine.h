@@ -41,4 +41,6 @@ typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 //Hash
 -(NSString *)generateHashWithParameters:(NSArray *)parameters;
 
+-(NSString *)tableNameForClassName:(NSString *)className;
+
 @end

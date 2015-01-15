@@ -7,7 +7,7 @@
 //
 
 #import "AppDelegate.h"
-#import "CoreData+DMECoreData.h"
+#import "DMECoreData.h"
 
 @interface AppDelegate ()
 
@@ -19,6 +19,8 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
     return YES;
+    
+    [NSManagedObject objectsFilterBy:<#(NSPredicate *)#>];
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application {

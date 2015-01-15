@@ -21,18 +21,19 @@
 #import "AFNetworkActivityLogger.h"
 #import "AFNetworkActivityIndicatorManager.h"
 
+#import "DMECoreDataStack.h"
+
 #import "NSString+Hashes.h"
 #import "NSString+Inflections.h"
 #import "NSObject+PWObject.h"
 #import "NSFetchedResultsController+Fetch.h"
+#import "NSManagedObject+Fetch.h"
 #import "NSManagedObject+Files.h"
 #import "NSManagedObject+Serialize.h"
 #import "NSManagedObject+Translation.h"
 #import "NSManagedObject+Unique.h"
-#import "NSManagedObjectContext+ModelOperations.h"
 #import "NSPredicate+Fields.h"
 
-#import "DMECoreDataStack.h"
 #import "DMEAPIEngine.h"
 #import "DMEThumbnailer.h"
 #import "DMESyncEngine.h"

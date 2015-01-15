@@ -16,8 +16,6 @@
 }
 
 - (NSDictionary *)filesURLToObjectOnServer {
-    /*@throw [NSException exceptionWithName:@"filesURLToObjectOnServer Not Overridden" reason:@"Must override filesURLToObjectOnServer on NSManagedObject class" userInfo:nil];
-    return nil;*/
     return @{};
 }
 

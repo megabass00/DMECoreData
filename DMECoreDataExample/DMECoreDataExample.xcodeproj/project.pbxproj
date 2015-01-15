@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		271BA5EC1A665E2A00E2CB88 /* GETSyncEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 271BA5EB1A665E2A00E2CB88 /* GETSyncEngine.m */; };
-		271BA5EF1A66601200E2CB88 /* GETAPIEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 271BA5EE1A66601200E2CB88 /* GETAPIEngine.m */; };
 		273ED72D1A657ADF008BDCFB /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED72C1A657ADF008BDCFB /* main.m */; };
 		273ED7301A657ADF008BDCFB /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED72F1A657ADF008BDCFB /* AppDelegate.m */; };
 		273ED7331A657ADF008BDCFB /* DMECoreDataExample.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7311A657ADF008BDCFB /* DMECoreDataExample.xcdatamodeld */; };
@@ -17,14 +15,18 @@
 		273ED73B1A657ADF008BDCFB /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 273ED73A1A657ADF008BDCFB /* Images.xcassets */; };
 		273ED73E1A657ADF008BDCFB /* LaunchScreen.xib in Resources */ = {isa = PBXBuildFile; fileRef = 273ED73C1A657ADF008BDCFB /* LaunchScreen.xib */; };
 		273ED74A1A657ADF008BDCFB /* DMECoreDataExampleTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7491A657ADF008BDCFB /* DMECoreDataExampleTests.m */; };
-		273ED7631A657B79008BDCFB /* NSFetchedResultsController+Fetch.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7561A657B79008BDCFB /* NSFetchedResultsController+Fetch.m */; };
-		273ED7641A657B79008BDCFB /* NSManagedObject+Files.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7581A657B79008BDCFB /* NSManagedObject+Files.m */; };
-		273ED7651A657B79008BDCFB /* NSManagedObject+Serialize.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED75A1A657B79008BDCFB /* NSManagedObject+Serialize.m */; };
-		273ED7661A657B79008BDCFB /* NSManagedObject+Translation.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED75C1A657B79008BDCFB /* NSManagedObject+Translation.m */; };
-		273ED7671A657B79008BDCFB /* NSManagedObject+Unique.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED75E1A657B79008BDCFB /* NSManagedObject+Unique.m */; };
-		273ED7681A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7601A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.m */; };
-		273ED7691A657B79008BDCFB /* NSPredicate+Fields.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED7621A657B79008BDCFB /* NSPredicate+Fields.m */; };
-		273ED76C1A657B80008BDCFB /* CoreDataStack.m in Sources */ = {isa = PBXBuildFile; fileRef = 273ED76B1A657B80008BDCFB /* CoreDataStack.m */; };
+		27FFEE381A6803EC00B81E97 /* NSFetchedResultsController+Fetch.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE201A6803EC00B81E97 /* NSFetchedResultsController+Fetch.m */; };
+		27FFEE391A6803EC00B81E97 /* NSManagedObject+Fetch.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE221A6803EC00B81E97 /* NSManagedObject+Fetch.m */; };
+		27FFEE3A1A6803EC00B81E97 /* NSManagedObject+Files.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE241A6803EC00B81E97 /* NSManagedObject+Files.m */; };
+		27FFEE3B1A6803EC00B81E97 /* NSManagedObject+Serialize.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE261A6803EC00B81E97 /* NSManagedObject+Serialize.m */; };
+		27FFEE3C1A6803EC00B81E97 /* NSManagedObject+Translation.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE281A6803EC00B81E97 /* NSManagedObject+Translation.m */; };
+		27FFEE3D1A6803EC00B81E97 /* NSManagedObject+Unique.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE2A1A6803EC00B81E97 /* NSManagedObject+Unique.m */; };
+		27FFEE3E1A6803EC00B81E97 /* NSObject+PWObject.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE2C1A6803EC00B81E97 /* NSObject+PWObject.m */; };
+		27FFEE3F1A6803EC00B81E97 /* NSPredicate+Fields.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE2E1A6803EC00B81E97 /* NSPredicate+Fields.m */; };
+		27FFEE401A6803EC00B81E97 /* NSString+Hashes.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE301A6803EC00B81E97 /* NSString+Hashes.m */; };
+		27FFEE411A6803EC00B81E97 /* DMEAPIEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE321A6803EC00B81E97 /* DMEAPIEngine.m */; };
+		27FFEE421A6803EC00B81E97 /* DMECoreDataStack.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE351A6803EC00B81E97 /* DMECoreDataStack.m */; };
+		27FFEE431A6803EC00B81E97 /* DMESyncEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 27FFEE371A6803EC00B81E97 /* DMESyncEngine.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,10 +40,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		271BA5EA1A665E2A00E2CB88 /* GETSyncEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GETSyncEngine.h; sourceTree = "<group>"; };
-		271BA5EB1A665E2A00E2CB88 /* GETSyncEngine.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GETSyncEngine.m; sourceTree = "<group>"; };
-		271BA5ED1A66601200E2CB88 /* GETAPIEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GETAPIEngine.h; sourceTree = "<group>"; };
-		271BA5EE1A66601200E2CB88 /* GETAPIEngine.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GETAPIEngine.m; sourceTree = "<group>"; };
 		273ED7271A657ADF008BDCFB /* DMECoreDataExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DMECoreDataExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		273ED72B1A657ADF008BDCFB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		273ED72C1A657ADF008BDCFB /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -56,23 +54,31 @@
 		273ED7431A657ADF008BDCFB /* DMECoreDataExampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DMECoreDataExampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		273ED7481A657ADF008BDCFB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		273ED7491A657ADF008BDCFB /* DMECoreDataExampleTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DMECoreDataExampleTests.m; sourceTree = "<group>"; };
-		273ED7551A657B79008BDCFB /* NSFetchedResultsController+Fetch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSFetchedResultsController+Fetch.h"; sourceTree = "<group>"; };
-		273ED7561A657B79008BDCFB /* NSFetchedResultsController+Fetch.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSFetchedResultsController+Fetch.m"; sourceTree = "<group>"; };
-		273ED7571A657B79008BDCFB /* NSManagedObject+Files.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Files.h"; sourceTree = "<group>"; };
-		273ED7581A657B79008BDCFB /* NSManagedObject+Files.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Files.m"; sourceTree = "<group>"; };
-		273ED7591A657B79008BDCFB /* NSManagedObject+Serialize.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Serialize.h"; sourceTree = "<group>"; };
-		273ED75A1A657B79008BDCFB /* NSManagedObject+Serialize.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Serialize.m"; sourceTree = "<group>"; };
-		273ED75B1A657B79008BDCFB /* NSManagedObject+Translation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Translation.h"; sourceTree = "<group>"; };
-		273ED75C1A657B79008BDCFB /* NSManagedObject+Translation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Translation.m"; sourceTree = "<group>"; };
-		273ED75D1A657B79008BDCFB /* NSManagedObject+Unique.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Unique.h"; sourceTree = "<group>"; };
-		273ED75E1A657B79008BDCFB /* NSManagedObject+Unique.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Unique.m"; sourceTree = "<group>"; };
-		273ED75F1A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObjectContext+ModelOperations.h"; sourceTree = "<group>"; };
-		273ED7601A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObjectContext+ModelOperations.m"; sourceTree = "<group>"; };
-		273ED7611A657B79008BDCFB /* NSPredicate+Fields.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSPredicate+Fields.h"; sourceTree = "<group>"; };
-		273ED7621A657B79008BDCFB /* NSPredicate+Fields.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSPredicate+Fields.m"; sourceTree = "<group>"; };
-		273ED76A1A657B80008BDCFB /* CoreDataStack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CoreDataStack.h; sourceTree = "<group>"; };
-		273ED76B1A657B80008BDCFB /* CoreDataStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CoreDataStack.m; sourceTree = "<group>"; };
-		273ED76E1A657E2D008BDCFB /* CoreData+DMECoreData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CoreData+DMECoreData.h"; sourceTree = "<group>"; };
+		27FFEE1F1A6803EC00B81E97 /* NSFetchedResultsController+Fetch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSFetchedResultsController+Fetch.h"; sourceTree = "<group>"; };
+		27FFEE201A6803EC00B81E97 /* NSFetchedResultsController+Fetch.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSFetchedResultsController+Fetch.m"; sourceTree = "<group>"; };
+		27FFEE211A6803EC00B81E97 /* NSManagedObject+Fetch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Fetch.h"; sourceTree = "<group>"; };
+		27FFEE221A6803EC00B81E97 /* NSManagedObject+Fetch.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Fetch.m"; sourceTree = "<group>"; };
+		27FFEE231A6803EC00B81E97 /* NSManagedObject+Files.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Files.h"; sourceTree = "<group>"; };
+		27FFEE241A6803EC00B81E97 /* NSManagedObject+Files.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Files.m"; sourceTree = "<group>"; };
+		27FFEE251A6803EC00B81E97 /* NSManagedObject+Serialize.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Serialize.h"; sourceTree = "<group>"; };
+		27FFEE261A6803EC00B81E97 /* NSManagedObject+Serialize.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Serialize.m"; sourceTree = "<group>"; };
+		27FFEE271A6803EC00B81E97 /* NSManagedObject+Translation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Translation.h"; sourceTree = "<group>"; };
+		27FFEE281A6803EC00B81E97 /* NSManagedObject+Translation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Translation.m"; sourceTree = "<group>"; };
+		27FFEE291A6803EC00B81E97 /* NSManagedObject+Unique.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSManagedObject+Unique.h"; sourceTree = "<group>"; };
+		27FFEE2A1A6803EC00B81E97 /* NSManagedObject+Unique.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSManagedObject+Unique.m"; sourceTree = "<group>"; };
+		27FFEE2B1A6803EC00B81E97 /* NSObject+PWObject.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSObject+PWObject.h"; sourceTree = "<group>"; };
+		27FFEE2C1A6803EC00B81E97 /* NSObject+PWObject.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSObject+PWObject.m"; sourceTree = "<group>"; };
+		27FFEE2D1A6803EC00B81E97 /* NSPredicate+Fields.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSPredicate+Fields.h"; sourceTree = "<group>"; };
+		27FFEE2E1A6803EC00B81E97 /* NSPredicate+Fields.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSPredicate+Fields.m"; sourceTree = "<group>"; };
+		27FFEE2F1A6803EC00B81E97 /* NSString+Hashes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+Hashes.h"; sourceTree = "<group>"; };
+		27FFEE301A6803EC00B81E97 /* NSString+Hashes.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+Hashes.m"; sourceTree = "<group>"; };
+		27FFEE311A6803EC00B81E97 /* DMEAPIEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DMEAPIEngine.h; sourceTree = "<group>"; };
+		27FFEE321A6803EC00B81E97 /* DMEAPIEngine.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DMEAPIEngine.m; sourceTree = "<group>"; };
+		27FFEE331A6803EC00B81E97 /* DMECoreData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DMECoreData.h; sourceTree = "<group>"; };
+		27FFEE341A6803EC00B81E97 /* DMECoreDataStack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DMECoreDataStack.h; sourceTree = "<group>"; };
+		27FFEE351A6803EC00B81E97 /* DMECoreDataStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DMECoreDataStack.m; sourceTree = "<group>"; };
+		27FFEE361A6803EC00B81E97 /* DMESyncEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DMESyncEngine.h; sourceTree = "<group>"; };
+		27FFEE371A6803EC00B81E97 /* DMESyncEngine.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DMESyncEngine.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,7 +120,7 @@
 		273ED7291A657ADF008BDCFB /* DMECoreDataExample */ = {
 			isa = PBXGroup;
 			children = (
-				273ED7531A657B5C008BDCFB /* DMECoreData */,
+				27FFEE1D1A6803EC00B81E97 /* DMECoreData */,
 				273ED72E1A657ADF008BDCFB /* AppDelegate.h */,
 				273ED72F1A657ADF008BDCFB /* AppDelegate.m */,
 				273ED7341A657ADF008BDCFB /* ViewController.h */,
@@ -154,40 +160,45 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
-		273ED7531A657B5C008BDCFB /* DMECoreData */ = {
+		27FFEE1D1A6803EC00B81E97 /* DMECoreData */ = {
 			isa = PBXGroup;
 			children = (
-				273ED76E1A657E2D008BDCFB /* CoreData+DMECoreData.h */,
-				273ED76A1A657B80008BDCFB /* CoreDataStack.h */,
-				273ED76B1A657B80008BDCFB /* CoreDataStack.m */,
-				271BA5EA1A665E2A00E2CB88 /* GETSyncEngine.h */,
-				271BA5EB1A665E2A00E2CB88 /* GETSyncEngine.m */,
-				271BA5ED1A66601200E2CB88 /* GETAPIEngine.h */,
-				271BA5EE1A66601200E2CB88 /* GETAPIEngine.m */,
-				273ED7541A657B68008BDCFB /* Categories */,
+				27FFEE1E1A6803EC00B81E97 /* Categories */,
+				27FFEE311A6803EC00B81E97 /* DMEAPIEngine.h */,
+				27FFEE321A6803EC00B81E97 /* DMEAPIEngine.m */,
+				27FFEE331A6803EC00B81E97 /* DMECoreData.h */,
+				27FFEE341A6803EC00B81E97 /* DMECoreDataStack.h */,
+				27FFEE351A6803EC00B81E97 /* DMECoreDataStack.m */,
+				27FFEE361A6803EC00B81E97 /* DMESyncEngine.h */,
+				27FFEE371A6803EC00B81E97 /* DMESyncEngine.m */,
 			);
 			name = DMECoreData;
+			path = ../../DMECoreData;
 			sourceTree = "<group>";
 		};
-		273ED7541A657B68008BDCFB /* Categories */ = {
+		27FFEE1E1A6803EC00B81E97 /* Categories */ = {
 			isa = PBXGroup;
 			children = (
-				273ED7551A657B79008BDCFB /* NSFetchedResultsController+Fetch.h */,
-				273ED7561A657B79008BDCFB /* NSFetchedResultsController+Fetch.m */,
-				273ED7571A657B79008BDCFB /* NSManagedObject+Files.h */,
-				273ED7581A657B79008BDCFB /* NSManagedObject+Files.m */,
-				273ED7591A657B79008BDCFB /* NSManagedObject+Serialize.h */,
-				273ED75A1A657B79008BDCFB /* NSManagedObject+Serialize.m */,
-				273ED75B1A657B79008BDCFB /* NSManagedObject+Translation.h */,
-				273ED75C1A657B79008BDCFB /* NSManagedObject+Translation.m */,
-				273ED75D1A657B79008BDCFB /* NSManagedObject+Unique.h */,
-				273ED75E1A657B79008BDCFB /* NSManagedObject+Unique.m */,
-				273ED75F1A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.h */,
-				273ED7601A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.m */,
-				273ED7611A657B79008BDCFB /* NSPredicate+Fields.h */,
-				273ED7621A657B79008BDCFB /* NSPredicate+Fields.m */,
+				27FFEE1F1A6803EC00B81E97 /* NSFetchedResultsController+Fetch.h */,
+				27FFEE201A6803EC00B81E97 /* NSFetchedResultsController+Fetch.m */,
+				27FFEE211A6803EC00B81E97 /* NSManagedObject+Fetch.h */,
+				27FFEE221A6803EC00B81E97 /* NSManagedObject+Fetch.m */,
+				27FFEE231A6803EC00B81E97 /* NSManagedObject+Files.h */,
+				27FFEE241A6803EC00B81E97 /* NSManagedObject+Files.m */,
+				27FFEE251A6803EC00B81E97 /* NSManagedObject+Serialize.h */,
+				27FFEE261A6803EC00B81E97 /* NSManagedObject+Serialize.m */,
+				27FFEE271A6803EC00B81E97 /* NSManagedObject+Translation.h */,
+				27FFEE281A6803EC00B81E97 /* NSManagedObject+Translation.m */,
+				27FFEE291A6803EC00B81E97 /* NSManagedObject+Unique.h */,
+				27FFEE2A1A6803EC00B81E97 /* NSManagedObject+Unique.m */,
+				27FFEE2B1A6803EC00B81E97 /* NSObject+PWObject.h */,
+				27FFEE2C1A6803EC00B81E97 /* NSObject+PWObject.m */,
+				27FFEE2D1A6803EC00B81E97 /* NSPredicate+Fields.h */,
+				27FFEE2E1A6803EC00B81E97 /* NSPredicate+Fields.m */,
+				27FFEE2F1A6803EC00B81E97 /* NSString+Hashes.h */,
+				27FFEE301A6803EC00B81E97 /* NSString+Hashes.m */,
 			);
-			name = Categories;
+			path = Categories;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -289,20 +300,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				273ED7671A657B79008BDCFB /* NSManagedObject+Unique.m in Sources */,
-				273ED7651A657B79008BDCFB /* NSManagedObject+Serialize.m in Sources */,
-				273ED7631A657B79008BDCFB /* NSFetchedResultsController+Fetch.m in Sources */,
+				27FFEE381A6803EC00B81E97 /* NSFetchedResultsController+Fetch.m in Sources */,
+				27FFEE3A1A6803EC00B81E97 /* NSManagedObject+Files.m in Sources */,
 				273ED7331A657ADF008BDCFB /* DMECoreDataExample.xcdatamodeld in Sources */,
+				27FFEE431A6803EC00B81E97 /* DMESyncEngine.m in Sources */,
+				27FFEE411A6803EC00B81E97 /* DMEAPIEngine.m in Sources */,
+				27FFEE3F1A6803EC00B81E97 /* NSPredicate+Fields.m in Sources */,
 				273ED7301A657ADF008BDCFB /* AppDelegate.m in Sources */,
 				273ED7361A657ADF008BDCFB /* ViewController.m in Sources */,
+				27FFEE3C1A6803EC00B81E97 /* NSManagedObject+Translation.m in Sources */,
+				27FFEE391A6803EC00B81E97 /* NSManagedObject+Fetch.m in Sources */,
+				27FFEE3B1A6803EC00B81E97 /* NSManagedObject+Serialize.m in Sources */,
+				27FFEE3D1A6803EC00B81E97 /* NSManagedObject+Unique.m in Sources */,
+				27FFEE421A6803EC00B81E97 /* DMECoreDataStack.m in Sources */,
+				27FFEE3E1A6803EC00B81E97 /* NSObject+PWObject.m in Sources */,
 				273ED72D1A657ADF008BDCFB /* main.m in Sources */,
-				271BA5EF1A66601200E2CB88 /* GETAPIEngine.m in Sources */,
-				273ED7641A657B79008BDCFB /* NSManagedObject+Files.m in Sources */,
-				273ED7691A657B79008BDCFB /* NSPredicate+Fields.m in Sources */,
-				271BA5EC1A665E2A00E2CB88 /* GETSyncEngine.m in Sources */,
-				273ED7661A657B79008BDCFB /* NSManagedObject+Translation.m in Sources */,
-				273ED7681A657B79008BDCFB /* NSManagedObjectContext+ModelOperations.m in Sources */,
-				273ED76C1A657B80008BDCFB /* CoreDataStack.m in Sources */,
+				27FFEE401A6803EC00B81E97 /* NSString+Hashes.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
