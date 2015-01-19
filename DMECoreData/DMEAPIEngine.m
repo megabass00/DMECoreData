@@ -201,7 +201,7 @@
         }
     } success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-            completionBlock([[(NSDictionary *)responseObject objectForKey:@"result"] objectForKey:className], nil);
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
@@ -228,7 +228,7 @@
     
     [self DELETE:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-            completionBlock([[(NSDictionary *)responseObject objectForKey:@"result"] objectForKey:className], nil);
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error al borrar", nil) code:6686 userInfo:@{}]);

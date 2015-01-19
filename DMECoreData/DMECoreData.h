@@ -28,6 +28,7 @@
 #import "NSObject+PWObject.h"
 #import "NSFetchedResultsController+Fetch.h"
 #import "NSManagedObject+Fetch.h"
+#import "NSManagedObject+Manipulate.h"
 #import "NSManagedObject+Files.h"
 #import "NSManagedObject+Serialize.h"
 #import "NSManagedObject+Translation.h"

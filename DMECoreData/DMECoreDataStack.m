@@ -224,8 +224,6 @@ static DMECoreDataStack *sharedInstance = nil;
     // Part of the problem is that the stack keeps a cache of the data that is in the file. When you
     // remove the file you don't have a way to clear that cache and you are then putting
     // Core Data into an unknown and unstable state.
-    
-    
     _backgroundContext = nil;
     _mainContext = nil;
     _privateContext = nil;
@@ -236,52 +234,43 @@ static DMECoreDataStack *sharedInstance = nil;
     
 }
 
--(void) saveWithErrorBlock: (void(^)(NSError *error))errorBlock{
-    
+-(void) saveWithCompletionBlock:(void(^)(BOOL didSave, NSError *error))completionBlock
+{
     //Guardamos el contexto principal de la interfaz
+    __block NSError *err = nil;
+    __block BOOL success = NO;
     [self.mainContext performBlockAndWait:^{
-        NSError *err = nil;
-        
-        // If a context is nil, saving it should also be considered an
-        // error, as being nil might be the result of a previous error
-        // while creating the db.
         if (!_mainContext) {
-            err = [NSError errorWithDomain:@"DMECoreDataStack"
+            err = [NSError errorWithDomain:@"com.damarte.coredata"
                                       code:1
-                                  userInfo:@{NSLocalizedDescriptionKey :
-                                                 @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
-            errorBlock(err);
-            
-        }else if (self.context.hasChanges) {
-            //DDLogInfo(@"---- Saving main context... ----");
-            if (![self.context save:&err]) {
-                errorBlock(err);
+                                  userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
+            completionBlock(success, err);
+        }
+        else if (self.context.hasChanges) {
+            success = [self.context save:&err];
+            if (success && !err) {
+                //Guardamos el contexto que escribe en disco
+                [self.privateContext performBlock:^{
+                    if (!_privateContext) {
+                        err = [NSError errorWithDomain:@"com.damarte.coredata"
+                                                  code:1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no private context - probably there was an earlier error trying to access the CoreData database file."}];
+                        completionBlock(success, err);
+                    }
+                    else if (self.privateContext.hasChanges) {
+                        success = [self.privateContext save:&err];
+                        completionBlock(success, err);
+                    }
+                    else{
+                        completionBlock(NO, err);
+                    }
+                }];
             }
-            //DDLogInfo(@"---- Main context saved ----");
+        }
+        else{
+            completionBlock(NO, err);
         }
     }];
-    
-    
-    //Guardamos el contexto que escribe en disco
-    [self.privateContext performBlock:^{
-        NSError *err = nil;
-        
-        if (!_privateContext) {
-            err = [NSError errorWithDomain:@"DMECoreDataStack"
-                                      code:1
-                                  userInfo:@{NSLocalizedDescriptionKey :
-                                                 @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no private context - probably there was an earlier error trying to access the CoreData database file."}];
-            errorBlock(err);
-            
-        }else if (self.privateContext.hasChanges) {
-            //DDLogInfo(@"---- Writing into disk... ----");
-            if (![self.privateContext save:&err]) {
-                errorBlock(err);
-            }
-            //DDLogInfo(@"---- Context saved into disk ----");
-        }
-    }];
-    
 }
 
 @end

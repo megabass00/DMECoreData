@@ -28,6 +28,6 @@
 
 -(void) zapAllData;
 
--(void) saveWithErrorBlock: (void(^)(NSError *error))errorBlock;
+-(void) saveWithCompletionBlock:(void(^)(BOOL didSave, NSError *error))completionBlock;
 
 @end

@@ -10,10 +10,6 @@
 
 @implementation NSManagedObject (Fetch)
 
-+(void)test{
-    
-}
-
 #pragma mark - FetchResultController
 
 +(NSFetchedResultsController *) fetchAllObjects
@@ -310,7 +306,9 @@
     }
 }
 
-+ (NSString *) entityNameChildClass;
+#pragma mark - Other
+
++(NSString *) entityNameChildClass
 {
     NSString *entityName;
     

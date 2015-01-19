@@ -358,19 +358,22 @@ typedef void (^DownloadCompletionBlock)();
     _syncInProgress = YES;
     [self didChangeValueForKey:@"syncInProgress"];
     
-    [[DMECoreDataStack sharedInstance].mainContext performBlockAndWait:^{
-        [[DMECoreDataStack sharedInstance] saveWithErrorBlock:^(NSError *error) {
+    [[DMECoreDataStack sharedInstance] saveWithCompletionBlock:^(BOOL didSave, NSError *error) {
+        if(!error){
+            if(self.startBlock){
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    self.startBlock();
+                });
+            }
+            
+            [self.context performBlock:^{
+                completionBlock();
+            }];
+        }
+        else{
             [self logError:@"Error when save main context: %@",error];
-        }];
+        }
     }];
-    
-    if(self.startBlock){
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.startBlock();
-        });
-    }
-    
-    completionBlock();
 }
 
 //Final de la sincronizacion
@@ -733,10 +736,9 @@ typedef void (^DownloadCompletionBlock)();
 - (void)saveContext:(void (^)(BOOL result))success
 {
     [self.context performBlockAndWait:^{
-        __block BOOL result = YES;
+        BOOL result = YES;
         
-        if(self.context.hasChanges || !self.initialSyncComplete){
-            //[self logInfo:@"---- Saving background context... ----"];
+        if(self.context.hasChanges){
             // Execute the sync completion operations as this is now the final step of the sync process
             NSError *error = nil;
             
@@ -757,13 +759,21 @@ typedef void (^DownloadCompletionBlock)();
         }
         
         if(result){
-            [[DMECoreDataStack sharedInstance] saveWithErrorBlock:^(NSError *error) {
-                [self logError:@"Error when save main context: %@", error];
-                result = NO;
+            [[DMECoreDataStack sharedInstance] saveWithCompletionBlock:^(BOOL didSave, NSError *error) {
+                if(!error){
+                    success(YES);
+                }
+                else{
+                    [self logError:@"Error when save main context: %@", error];
+                    success(NO);
+                }
             }];
         }
+        else{
+            success(NO);
+        }
         
-        success(result);
+        
     }];
 }
 
@@ -1158,6 +1168,7 @@ typedef void (^DownloadCompletionBlock)();
             NSArray *objectsToCreate = [self managedObjectsForClass:className withSyncStatus:ObjectCreated];
             
             if(objectsToCreate.count > 0){
+                //TODO Arreglar barra de progreso al enviar, actualizar y borrar obetos
                 [self progressBlockTotal:objectsToCreate.count inMainProcess:NO];
                 
                 // Create a dispatch group
@@ -1440,7 +1451,7 @@ typedef void (^DownloadCompletionBlock)();
                         
                         [[DMEAPIEngine sharedInstance] deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
                             [self.context performBlock:^{
-                                if(!error && object.count > 0 && [object valueForKey:@"id"]){
+                                if(!error && object.count > 0 && [[object objectForKey:className] valueForKey:@"id"]){
                                     //Delete object in Core Data
                                     [self.context deleteObject:objectToDelete];
                                     

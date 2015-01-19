@@ -10,8 +10,6 @@
 
 @interface NSManagedObject (Fetch)
 
-+(void)test;
-
 #pragma mark - FetchResultController
 
 +(NSFetchedResultsController *) fetchAllObjects;
@@ -81,5 +79,9 @@
 
 +(NSInteger) countAllObjectsInContext:(NSManagedObjectContext *)aContext;
 +(NSInteger) countObjectsFilterBy:(NSPredicate *)aPredicate inContext:(NSManagedObjectContext *)aContext;
+
+#pragma mark - Other
+
++(NSString *) entityNameChildClass;
 
 @end
