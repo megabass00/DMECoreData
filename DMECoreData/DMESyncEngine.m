@@ -1151,6 +1151,8 @@ typedef void (^DownloadCompletionBlock)();
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Enviando datos al servidor...", nil) important:YES];
             
+            [self progressBlockTotal:self.registeredClassesToSync.count inMainProcess:NO];
+            
             //Recursive call
             [self postLocalObjectsToServerOfClassWithId:0 completionBlock:^{
                 [self progressBlockIncrementInMainProcess:YES];
@@ -1172,15 +1174,14 @@ typedef void (^DownloadCompletionBlock)();
     }
     else{
         if(self.initialSyncComplete && self.registeredClassesToSync.count > 0){
+            [self progressBlockIncrementInMainProcess:NO];
+            
             NSString *className = [self.registeredClassesToSync objectAtIndex:index];
             
             // Fetch all objects from Core Data whose syncStatus is equal to SDObjectCreated
             NSArray *objectsToCreate = [self managedObjectsForClass:className withSyncStatus:ObjectCreated];
             
             if(objectsToCreate.count > 0){
-                //TODO Arreglar barra de progreso al enviar, actualizar y borrar obetos
-                [self progressBlockTotal:objectsToCreate.count inMainProcess:NO];
-                
                 // Create a dispatch group
                 __block dispatch_group_t groupGeneral = dispatch_group_create();
                 
@@ -1265,8 +1266,6 @@ typedef void (^DownloadCompletionBlock)();
                                     
                                     dispatch_group_leave(groupGeneral);
                                 }
-                                
-                                [self progressBlockIncrementInMainProcess:NO];
                             }];
                         }];
                     }
@@ -1294,6 +1293,8 @@ typedef void (^DownloadCompletionBlock)();
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Modificando datos en el servidor...", nil) important:YES];
             
+            [self progressBlockTotal:self.registeredClassesToSync.count inMainProcess:NO];
+            
             //Recursive call
             [self updateLocalObjectsToServerOfClassWithId:0 completionBlock:^{
                 [self progressBlockIncrementInMainProcess:YES];
@@ -1316,14 +1317,14 @@ typedef void (^DownloadCompletionBlock)();
     }
     else{
         if(self.initialSyncComplete && self.registeredClassesToSync.count > 0){
+            [self progressBlockIncrementInMainProcess:NO];
+            
             NSString *className = [self.registeredClassesToSync objectAtIndex:index];
             
             // Fetch all objects from Core Data whose syncStatus is equal to SDObjectCreated
             NSArray *objectsToModified = [self managedObjectsForClass:className withSyncStatus:ObjectModified];
             
             if(objectsToModified.count > 0){
-                [self progressBlockTotal:objectsToModified.count inMainProcess:NO];
-                
                 // Create a dispatch group
                 __block dispatch_group_t groupGeneral = dispatch_group_create();
                 
@@ -1387,8 +1388,6 @@ typedef void (^DownloadCompletionBlock)();
                                     
                                     dispatch_group_leave(groupGeneral);
                                 }
-                                
-                                [self progressBlockIncrementInMainProcess:NO];
                             }];
                         }];
                     }
@@ -1416,6 +1415,8 @@ typedef void (^DownloadCompletionBlock)();
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Eliminando datos en el servidor...", nil) important:YES];
             
+            [self progressBlockTotal:self.registeredClassesToSync.count inMainProcess:NO];
+            
             //Recursive call
             [self deleteObjectsOnServerOfClassWithId:0 completionBlock:^{
                 [self progressBlockIncrementInMainProcess:YES];
@@ -1441,14 +1442,14 @@ typedef void (^DownloadCompletionBlock)();
     }
     else{
         if(self.initialSyncComplete && self.registeredClassesToSync.count > 0){
+            [self progressBlockIncrementInMainProcess:NO];
+            
             NSString *className = [self.registeredClassesToSync objectAtIndex:index];
             
             // Fetch all objects from Core Data whose syncStatus is equal to SDObjectCreated
             NSArray *objectsToDelete = [self managedObjectsForClass:className withSyncStatus:ObjectDeleted];
             
             if(objectsToDelete.count > 0){
-                [self progressBlockTotal:objectsToDelete.count inMainProcess:NO];
-                
                 // Create a dispatch group
                 __block dispatch_group_t groupGeneral = dispatch_group_create();
                 
@@ -1480,8 +1481,6 @@ typedef void (^DownloadCompletionBlock)();
                                     
                                     dispatch_group_leave(groupGeneral);
                                 }
-                                
-                                [self progressBlockIncrementInMainProcess:NO];
                             }];
                         }];
                     }
