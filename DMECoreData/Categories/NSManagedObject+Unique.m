@@ -11,7 +11,7 @@
 @implementation NSManagedObject (Unique)
 
 -(BOOL)validateId:(id *)ioValue error:(NSError * __autoreleasing *)outError {
-    if([self respondsToSelector:@selector(id)]){
+    if(ValidateUniqueId && [self respondsToSelector:@selector(id)]){
         NSString *id = [self valueForKey:@"id"];
         
         if (!id || [id isEqualToString:@""]) {

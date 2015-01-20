@@ -806,13 +806,21 @@ typedef void (^DownloadCompletionBlock)();
 - (NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate {
     NSArray *JSONArray = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
     NSArray *result = [JSONArray sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
-        NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
-        NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
-        if (first > second)
-            return NSOrderedDescending;
-        if (first < second)
-            return NSOrderedAscending;
-        return NSOrderedSame;
+        if([[[(NSDictionary*)a objectForKey:className] objectForKey:key] isKindOfClass:[NSString class]]){
+            NSString *first = [[(NSDictionary*)a objectForKey:className] objectForKey:key];
+            NSString *second = [[(NSDictionary*)b objectForKey:className] objectForKey:key];
+            
+            return [first localizedStandardCompare:second];
+        }
+        else{
+            NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
+            NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
+            if (first > second)
+                return NSOrderedDescending;
+            if (first < second)
+                return NSOrderedAscending;
+            return NSOrderedSame;
+        }
     }];
     return result;
 }
@@ -1024,6 +1032,8 @@ typedef void (^DownloadCompletionBlock)();
                             //Avanzamos ambos cursores
                             record = [JSONEnumerator nextObject];
                             storedManagedObject = [fetchResultsEnumerator nextObject];
+                            
+                            [self progressBlockIncrementInMainProcess:NO];
                         }
                         else{
                             if([self managedObjectForClass:className withId:id]){
@@ -1032,6 +1042,8 @@ typedef void (^DownloadCompletionBlock)();
                             else{
                                 [self newManagedObjectWithClassName:className forRecord:record];
                                 record = [JSONEnumerator nextObject];
+                                
+                                [self progressBlockIncrementInMainProcess:NO];
                             }
                         }
                     }
@@ -1045,8 +1057,6 @@ typedef void (^DownloadCompletionBlock)();
                         
                         return;
                     }
-                    
-                    [self progressBlockIncrementInMainProcess:NO];
                 }
             }
             

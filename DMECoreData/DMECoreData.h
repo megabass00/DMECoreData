@@ -39,14 +39,15 @@
 #import "DMEThumbnailer.h"
 #import "DMESyncEngine.h"
 
-extern NSInteger const TimeoutInterval;
-extern NSInteger const MaxConcurrentDownload;
-extern NSString *const URLUploads;
-extern NSString *const ModelName;
-extern NSString *const SecuritySalt;
-extern NSInteger const ddLogLevel;
-extern NSString *const URLAPI;
-extern NSDictionary* thumbnailSize();
-extern NSString* pathCache();
+extern NSInteger const TimeoutInterval;         //Timeout de las peticiones al API
+extern NSInteger const MaxConcurrentDownload;   //Numero máximo de descargas simultaneas de ficheros
+extern NSString *const URLUploads;              //URL de las descargas de ficheros
+extern NSString *const ModelName;               //Nombre del modelo
+extern NSString *const SecuritySalt;            //Salt de seguridad
+extern NSInteger const ddLogLevel;              //Nivel de log
+extern NSString *const URLAPI;                  //URL del API
+extern BOOL const ValidateUniqueId;             //Indica si se validan los ids como unicos
+extern NSDictionary* thumbnailSize();           //Tamaños de thumbnails
+extern NSString* pathCache();                   //Directorio de cache
 
 #endif
