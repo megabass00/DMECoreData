@@ -266,6 +266,9 @@ static DMECoreDataStack *sharedInstance = nil;
                     }
                 }];
             }
+            else{
+                completionBlock(NO, err);
+            }
         }
         else{
             completionBlock(NO, err);
