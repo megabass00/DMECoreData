@@ -17,7 +17,7 @@
         NSError *error;
         [self performFetch:&error];
         
-        if(!error){
+        if(!error && self.fetchedObjects.count > 0){
             result = self.fetchedObjects.copy;
         }
     }];

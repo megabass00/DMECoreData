@@ -52,7 +52,6 @@
     return [self fetchObjectsOrderBy:sortDescriptors filterBy:aPredicate sectionNameKeyPath:key inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
 
-
 +(NSFetchedResultsController *) fetchObjectWithId:(NSString *)aId
 {
     return [self fetchObjectWithId:aId inContext:[DMECoreDataStack sharedInstance].mainContext];
@@ -194,7 +193,6 @@
     return [self objectsOrderBy:sortDescriptors filterBy:aPredicate sectionNameKeyPath:key inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
 
-
 +(instancetype) objectWithId:(NSString *)aId {
     return [self objectWithId:aId inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
@@ -221,7 +219,6 @@
     return [[self fetchAllObjectsOrderBy:sortDescriptors inContext:aContext] fetchAll];
 }
 
-
 +(NSArray *) objectsFilterBy:(NSPredicate *)aPredicate inContext:(NSManagedObjectContext *)aContext
 {
     return [[self fetchObjectFilterBy:aPredicate inContext:aContext] fetchAll];
@@ -247,7 +244,6 @@
     return [[self fetchObjectsOrderBy:sortDescriptors filterBy:aPredicate sectionNameKeyPath:key inContext:aContext] fetchAll];
 }
 
-
 +(instancetype) objectWithId:(NSString *)aId inContext:(NSManagedObjectContext *)aContext
 {
     return [[self fetchObjectWithId:aId inContext:aContext] fetchFirst];
@@ -269,7 +265,6 @@
 {
     return [self countObjectsFilterBy:aPredicate inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
-
 
 #pragma mark - Count with context
 
