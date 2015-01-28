@@ -29,7 +29,7 @@
 
 +(NSFetchedResultsController *) fetchObjectsFilterBy:(NSPredicate *)aPredicate
 {
-    return [self fetchObjectFilterBy:aPredicate inContext:[DMECoreDataStack sharedInstance].mainContext];
+    return [self fetchObjectsFilterBy:aPredicate inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
 
 +(NSFetchedResultsController *) fetchObjectsOrderBy:(NSString *)orderField orderAscending:(BOOL)ascending filterBy:(NSPredicate *)aPredicate
@@ -172,7 +172,6 @@
     return [self allObjectsOrderBy:sortDescriptors inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
 
-
 +(NSArray *) objectsFilterBy:(NSPredicate *)aPredicate {
     return [self objectsFilterBy:aPredicate inContext:[DMECoreDataStack sharedInstance].mainContext];
 }
@@ -221,7 +220,7 @@
 
 +(NSArray *) objectsFilterBy:(NSPredicate *)aPredicate inContext:(NSManagedObjectContext *)aContext
 {
-    return [[self fetchObjectFilterBy:aPredicate inContext:aContext] fetchAll];
+    return [[self fetchObjectsFilterBy:aPredicate inContext:aContext] fetchAll];
 }
 
 +(NSArray *) objectsOrderBy:(NSString *)orderField orderAscending:(BOOL)ascending filterBy:(NSPredicate *)aPredicate inContext:(NSManagedObjectContext *)aContext
@@ -270,13 +269,11 @@
 
 +(NSInteger) countAllObjectsInContext:(NSManagedObjectContext *)aContext
 {
-    [self countObjectsFilterBy:nil inContext:aContext];
+    return [self countObjectsFilterBy:nil inContext:aContext];
 }
 
 +(NSInteger) countObjectsFilterBy:(NSPredicate *)aPredicate inContext:(NSManagedObjectContext *)aContext
 {
-    NSFetchedResultsController *res = nil;
-    
     //Crear un request
     NSFetchRequest *req = [[NSFetchRequest alloc] initWithEntityName:[self entityNameChildClass]];
     

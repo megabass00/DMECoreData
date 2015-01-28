@@ -1071,75 +1071,75 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 - (void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock {
-    [self.context performBlock:^{
-        NSManagedObjectContext *managedObjectContext = self.context;
+    NSManagedObjectContext *managedObjectContext = self.context;
+    
+    // Iterate over all registered classes to sync
+    if(self.initialSyncComplete){
+        [self progressBlockTotal:self.classesToSync.count inMainProcess:NO];
         
-        // Iterate over all registered classes to sync
-        if(self.initialSyncComplete){
-            [self progressBlockTotal:self.classesToSync.count inMainProcess:NO];
-            
-            for (NSString *className in self.classesToSync) {
-                // Retrieve the JSON response records from disk
-                NSArray *JSONRecords = [self JSONDataRecordsForClass:className sortedByKey:@"id"];
-                NSArray *storedRecords;
-                if ([JSONRecords count] > 0) {
-                    // If there are any records fetch all locally stored records that are NOT in the list of downloaded records
-                    storedRecords = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONRecords valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
-                }
-                else{
-                    NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
-                    NSPredicate *notSyncPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectNotSync]}];
-                    NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:createdPredicate, notSyncPredicate, nil]];
-                    storedRecords = [self managedObjectsForClass:className withPredicate:andPredicate];
-                }
-                
-                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Limpiando información de %@ (%@ objetos)...", nil), [self logClassName:className], [NSNumber numberWithInteger:[storedRecords count]]] important:NO];
-                
-                // Schedule the NSManagedObject for deletion
-                for (NSManagedObject *managedObject in storedRecords) {
-                    [self logDebug:@"   Deleted %@", className];
-                    [managedObjectContext deleteObject:managedObject];
-                }
-                
-                [self progressBlockIncrementInMainProcess:NO];
-                
-                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ limpiada", nil), [self logClassName:className]] important:NO];
+        for (NSString *className in self.classesToSync) {
+            // Retrieve the JSON response records from disk
+            NSArray *JSONRecords = [self JSONDataRecordsForClass:className sortedByKey:@"id"];
+            NSArray *storedRecords;
+            if ([JSONRecords count] > 0) {
+                // If there are any records fetch all locally stored records that are NOT in the list of downloaded records
+                storedRecords = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONRecords valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
+            }
+            else{
+                NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
+                NSPredicate *notSyncPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectNotSync]}];
+                NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:createdPredicate, notSyncPredicate, nil]];
+                storedRecords = [self managedObjectsForClass:className withPredicate:andPredicate];
             }
             
-            [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
-            [self progressBlockIncrementInMainProcess:YES];
+            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Limpiando información de %@ (%@ objetos)...", nil), [self logClassName:className], [NSNumber numberWithInteger:[storedRecords count]]] important:NO];
+            
+            // Schedule the NSManagedObject for deletion
+            for (NSManagedObject *managedObject in storedRecords) {
+                [self logDebug:@"   Deleted %@", className];
+                [self.context performBlockAndWait:^{
+                    [managedObjectContext deleteObject:managedObject];
+                }];
+            }
+            
+            [self progressBlockIncrementInMainProcess:NO];
+            
+            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ limpiada", nil), [self logClassName:className]] important:NO];
         }
         
-        [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
-        
-        [self saveContext:^(BOOL result) {
-            if(result){
-                //Send syncstate remove order
-                if(self.classesToSync.count > 0 && self.initialSyncComplete){
-                    [[DMEAPIEngine sharedInstance] pushEntitiesSynchronized:self.classesToSync onCompletion:^(NSDictionary *object, NSError *error) {
-                        [self.context performBlock:^{
-                            if(!error){
-                                [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
-                            }
-                            else{
-                                NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
-                                                                andDescription:NSLocalizedString(@"No se ha podido limpiar la información de sincronización", nil)
-                                                              andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
-                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
-                                
-                                [self errorBlock:errorSync fatal:NO];
-                            }
-                        }];
+        [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
+        [self progressBlockIncrementInMainProcess:YES];
+    }
+    
+    [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
+    
+    [self saveContext:^(BOOL result) {
+        if(result){
+            //Send syncstate remove order
+            if(self.classesToSync.count > 0 && self.initialSyncComplete){
+                [[DMEAPIEngine sharedInstance] pushEntitiesSynchronized:self.classesToSync onCompletion:^(NSDictionary *object, NSError *error) {
+                    [self.context performBlock:^{
+                        if(!error){
+                            [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
+                        }
+                        else{
+                            NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
+                                                            andDescription:NSLocalizedString(@"No se ha podido limpiar la información de sincronización", nil)
+                                                          andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
+                                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
+                            
+                            [self errorBlock:errorSync fatal:NO];
+                        }
                     }];
-                }
-                
-                [self messageBlock:NSLocalizedString(@"Se han guardado los datos", nil) important:YES];
-                
-                if(completionBlock){
-                    completionBlock();
-                }
+                }];
             }
-        }];
+            
+            [self messageBlock:NSLocalizedString(@"Se han guardado los datos", nil) important:YES];
+            
+            if(completionBlock){
+                completionBlock();
+            }
+        }
     }];
 }
 
