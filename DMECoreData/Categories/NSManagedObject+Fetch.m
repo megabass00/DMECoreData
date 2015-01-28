@@ -109,6 +109,9 @@
     if(sortDescriptors){
         req.sortDescriptors = sortDescriptors;
     }
+    else{
+        req.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES]];
+    }
     
     //Predicado
     NSPredicate *syncPredicate = [NSPredicate predicateWithFormat:@"syncStatus != %@",[NSNumber numberWithInt:ObjectDeleted]];
