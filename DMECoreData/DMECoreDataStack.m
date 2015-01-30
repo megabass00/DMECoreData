@@ -95,8 +95,6 @@ static DMECoreDataStack *sharedInstance = nil;
     if (_privateContext == nil){
         _privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         _privateContext.persistentStoreCoordinator = self.storeCoordinator;
-        _privateContext.undoManager = nil;
-        _privateContext.retainsRegisteredObjects = NO;
         [_privateContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
@@ -104,13 +102,11 @@ static DMECoreDataStack *sharedInstance = nil;
 }
 
 
--(NSManagedObjectContext *)context{
+-(NSManagedObjectContext *)mainContext{
     //Creamos un solo contexto para el hilo actual
     if (_mainContext == nil){
         _mainContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         _mainContext.parentContext = [self privateContext];
-        _mainContext.undoManager = nil;
-        _mainContext.retainsRegisteredObjects = NO;
         [_mainContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
@@ -124,8 +120,6 @@ static DMECoreDataStack *sharedInstance = nil;
         //Creamos de nuevo el contexto background
         _backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         _backgroundContext.parentContext = [self mainContext];
-        _backgroundContext.undoManager = nil;
-        _backgroundContext.retainsRegisteredObjects = NO;
         [_backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
@@ -194,13 +188,10 @@ static DMECoreDataStack *sharedInstance = nil;
                                                 withExtension:@"momd"];
         self.dbURL = aDBURL;
         self.threadsContexts = [NSMutableDictionary dictionary];
-        [self context];
     }
     
     return self;
 }
-
-
 
 #pragma mark - Others
 
@@ -229,9 +220,8 @@ static DMECoreDataStack *sharedInstance = nil;
     _privateContext = nil;
     _storeCoordinator = nil;
     [self privateContext];
-    [self context]; // this will rebuild the stack
+    [self mainContext]; // this will rebuild the stack
     [self backgroundContext]; // this will rebuild the stack
-    
 }
 
 -(void) saveWithCompletionBlock:(void(^)(BOOL didSave, NSError *error))completionBlock
@@ -246,8 +236,8 @@ static DMECoreDataStack *sharedInstance = nil;
                                   userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
             completionBlock(success, err);
         }
-        else if (self.context.hasChanges) {
-            success = [self.context save:&err];
+        else if (self.mainContext.hasChanges) {
+            success = [self.mainContext save:&err];
             if (success && !err) {
                 //Guardamos el contexto que escribe en disco
                 [self.privateContext performBlock:^{
