@@ -114,14 +114,10 @@ static DMECoreDataStack *sharedInstance = nil;
 }
 
 -(NSManagedObjectContext *)backgroundContext{
-    //Creamos un solo contexto para el hilo en segundo plano
-    if (_backgroundContext == nil){
-        
-        //Creamos de nuevo el contexto background
-        _backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-        _backgroundContext.parentContext = [self mainContext];
-        [_backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
-    }
+    //Creamos de nuevo el contexto background
+    _backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    _backgroundContext.parentContext = [self mainContext];
+    [_backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     
     return _backgroundContext;
 }

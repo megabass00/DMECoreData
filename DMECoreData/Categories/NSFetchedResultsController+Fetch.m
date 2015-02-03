@@ -18,9 +18,10 @@
         [self performFetch:&error];
         
         if(!error && self.fetchedObjects.count > 0){
-            result = self.fetchedObjects.copy;
+            result = self.fetchedObjects;
         }
     }];
+    
     
     return result;
 }

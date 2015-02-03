@@ -111,7 +111,7 @@
     NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
     
     [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-        completionBlock([[((NSDictionary *)responseObject) objectForKey:@"sync_states"] copy], nil);
+        completionBlock([((NSDictionary *)responseObject) objectForKey:@"sync_states"], nil);
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completionBlock(nil, error);
     }];
