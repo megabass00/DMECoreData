@@ -48,6 +48,8 @@ typedef void (^DownloadCompletionBlock)();
 @property (nonatomic, strong) ProgressBlock progressBlock;
 @property (nonatomic, strong) MessageBlock messageBlock;
 
+@property (nonatomic, strong) NSDate *startDate;
+
 @end
 
 @implementation DMESyncEngine
@@ -353,6 +355,7 @@ typedef void (^DownloadCompletionBlock)();
     self.progressTotal = 0;
     self.progressSubprocessCurrent = 0;
     self.progressSubprocessTotal = 0;
+    self.startDate = [NSDate date];
     
     [self willChangeValueForKey:@"syncInProgress"];
     _syncInProgress = YES;
@@ -1117,7 +1120,7 @@ typedef void (^DownloadCompletionBlock)();
         if(result){
             //Send syncstate remove order
             if(self.classesToSync.count > 0 && self.initialSyncComplete){
-                [[DMEAPIEngine sharedInstance] pushEntitiesSynchronized:self.classesToSync onCompletion:^(NSDictionary *object, NSError *error) {
+                [[DMEAPIEngine sharedInstance] pushEntitiesSynchronized:self.startDate onCompletion:^(NSDictionary *object, NSError *error) {
                     [self.context performBlock:^{
                         if(!error){
                             [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
@@ -1555,6 +1558,7 @@ typedef void (^DownloadCompletionBlock)();
     self.downloadedFiles = 0;
     self.progressCurrent = 0;
     self.progressTotal = 0;
+    self.startDate = nil;
     
     //self.currentQueue = nil;
     idPredicateTemplate = nil;

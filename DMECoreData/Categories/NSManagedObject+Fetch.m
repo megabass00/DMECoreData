@@ -319,14 +319,12 @@
     return entityName;
 }
 
-+(instancetype) objectWithID:(NSManagedObjectID *)aId
-{
-    return [self objectWithID:aId inContext:[DMECoreDataStack sharedInstance].mainContext];
+-(instancetype) objectInMainContext{
+    return [self objectInContext:[DMECoreDataStack sharedInstance].mainContext];
 }
 
-+(instancetype) objectWithID:(NSManagedObjectID *)aId inContext:(NSManagedObjectContext *)aContext
-{
-    return aId ? [aContext objectWithID:aId] : nil;
+-(instancetype) objectInContext:(NSManagedObjectContext *)aContext{
+    return [aContext objectWithID:self.objectID];
 }
 
 @end

@@ -117,7 +117,7 @@
     }];
 }
 
-- (void)pushEntitiesSynchronized:(NSArray *)entities onCompletion:(OperationObjectCompletionBlock)completionBlock
+- (void)pushEntitiesSynchronized:(NSDate *)startDate onCompletion:(OperationObjectCompletionBlock)completionBlock
 {
     NSString *path = @"sync_states.json";
     
@@ -126,7 +126,14 @@
     NSString *hash = [self generateHashWithParameters:@[@"sync_states", uuid, version]];
     NSString *ios = [[UIDevice currentDevice] systemVersion];
     NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-    [basicParameters addEntriesFromDictionary:@{@"entities": entities}];
+    
+    if(startDate){
+        NSDateFormatter *gmtDateFormatter = [[NSDateFormatter alloc] init];
+        gmtDateFormatter.timeZone = [NSTimeZone timeZoneWithName:@"GMT"];
+        gmtDateFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        
+        [basicParameters addEntriesFromDictionary:@{@"last_sync_date": [gmtDateFormatter stringFromDate:startDate]}];
+    }
     
     [self POST:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){

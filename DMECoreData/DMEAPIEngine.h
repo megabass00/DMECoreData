@@ -27,7 +27,7 @@ typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 - (void)fetchEntitiesForSync:(FetchObjectsCompletionBlock)completionBlock;
 
 //Devuelve todas las entidades a sincronizar
-- (void)pushEntitiesSynchronized:(NSArray *)entities onCompletion:(OperationObjectCompletionBlock)completionBlock;
+- (void)pushEntitiesSynchronized:(NSDate *)startDate onCompletion:(OperationObjectCompletionBlock)completionBlock;
 
 //Envia un objeto al servidor
 - (void)pushObjectForClass:(NSString *)className parameters:(NSDictionary *)parameters files:(NSDictionary *)files onCompletion:(OperationObjectCompletionBlock)completionBlock;

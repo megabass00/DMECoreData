@@ -84,7 +84,7 @@
 
 +(NSString *) entityNameChildClass;
 
-+(instancetype) objectWithID:(NSManagedObjectID *)aId;
-+(instancetype) objectWithID:(NSManagedObjectID *)aId inContext:(NSManagedObjectContext *)aContext;
+-(instancetype) objectInMainContext;
+-(instancetype) objectInContext:(NSManagedObjectContext *)aContext;
 
 @end
