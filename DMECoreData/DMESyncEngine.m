@@ -540,18 +540,18 @@ typedef void (^DownloadCompletionBlock)();
                     SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", className]);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                    [managedObject performSelector:selector withObject:newRelationManagedObject];
+                    [managedObject performSelector:selector withObject:[newRelationManagedObject objectInContext:managedObject.managedObjectContext]];
 #pragma clang diagnostic pop
                 }
                 else{
                     //Obtenemos la relacion inversa
                     relationName = [[[relationsDictionary objectForKey:relationName] inverseRelationship] name];
                     
-                    [managedObject setValue:newRelationManagedObject forKey:relationName];
+                    [managedObject setValue:[newRelationManagedObject objectInContext:managedObject.managedObjectContext] forKey:relationName];
                 }
             }
             else{
-                [newRelationManagedObject setValue:managedObject forKey:relationName];
+                [newRelationManagedObject setValue:[managedObject objectInContext:newRelationManagedObject.managedObjectContext] forKey:relationName];
             }
             [self logDebug:@"   Updated relation %@ with id: %@", relationName, [record objectForKey:@"id"]];
         }
@@ -585,13 +585,13 @@ typedef void (^DownloadCompletionBlock)();
 -(NSString *)nameFromClassName:(NSString **)className relation:(NSString *)relation{
     //Obtenemos el nombre de la relacion
     NSString *relationName;
-    NSArray *classNameParts = [*className componentsSeparatedByString:@"_"];
+    NSArray *classNameParts = [*className componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"_"]];
     if([classNameParts count]>1){
         *className = [classNameParts objectAtIndex:0];
-        relationName = [NSString stringWithFormat:@"%@%@%@", [[[classNameParts objectAtIndex:0] substringToIndex:1] lowercaseString], [[classNameParts objectAtIndex:0] substringFromIndex:1], [classNameParts objectAtIndex:1]];
+        relationName = [[[[[classNameParts objectAtIndex:0] substringToIndex:1] lowercaseString] stringByAppendingString:[[classNameParts objectAtIndex:0] substringFromIndex:1]] stringByAppendingString:[classNameParts objectAtIndex:1]];
     }
     else{
-        relationName = [NSString stringWithFormat:@"%@%@", [[relation substringToIndex:1] lowercaseString], [relation substringFromIndex:1]];
+        relationName = [[[relation substringToIndex:1] lowercaseString] stringByAppendingString:[relation substringFromIndex:1]];
     }
     return relationName;
 }
@@ -599,20 +599,20 @@ typedef void (^DownloadCompletionBlock)();
 //Introduce un valor en una propiedad de un objeto Core Data
 - (void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject {
     //Si el objeto tiene esa propiedad
-    if([managedObject respondsToSelector:NSSelectorFromString(key)]){
+    if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isFault]){
         //Si es nulo lo convertimos en nil
         if([value isKindOfClass:[NSNull class]]){
             value = nil;
         }
         
         //Según el tipo asignamos el valor
-        if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString: @"NSDate"]) {    //Si es una fecha
+        if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
             if([value length] == 10){
                 value = [value stringByAppendingString:@" 00:00:00"];
             }
             NSDate *date = [self dateUsingStringFromAPI:value];
             [managedObject setValue:date forKey:key];
-        } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString: @"NSNumber"]) {    //Si es un numero
+        } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
             if([value isKindOfClass:[NSString class]]){
                 [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
                 
@@ -652,10 +652,7 @@ typedef void (^DownloadCompletionBlock)();
     NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
-    [fetchRequest setIncludesPropertyValues:NO];
-    [fetchRequest setIncludesSubentities:NO];
     [fetchRequest setPredicate:[[self syncStatusPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:syncStatus]}]];
-    [fetchRequest setReturnsObjectsAsFaults:YES];
     
     [self.context performBlockAndWait:^{
         NSError *error = nil;
@@ -670,7 +667,6 @@ typedef void (^DownloadCompletionBlock)();
     NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
-    [fetchRequest setIncludesSubentities:NO];
     if(predicate != nil){
         [fetchRequest setPredicate:predicate];
     }
@@ -692,9 +688,6 @@ typedef void (^DownloadCompletionBlock)();
 - (NSManagedObject *)managedObjectForClass:(NSString *)className withId:(NSString *)aId {
     NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
-    [fetchRequest setIncludesPropertyValues:NO];
-    [fetchRequest setIncludesSubentities:NO];
-    [fetchRequest setReturnsObjectsAsFaults:YES];
     [fetchRequest setFetchLimit:1];
     [fetchRequest setPredicate:[[self idPredicateTemplate] predicateWithSubstitutionVariables:@{@"ID": aId}]];
     
@@ -712,8 +705,6 @@ typedef void (^DownloadCompletionBlock)();
     __block NSArray *results = nil;
     NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
-    [fetchRequest setIncludesPropertyValues:NO];
-    [fetchRequest setIncludesSubentities:NO];
     NSPredicate *predicate;
     //TODO Optimizar a fuego
     if (inIds) {
@@ -1066,6 +1057,8 @@ typedef void (^DownloadCompletionBlock)();
             [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ guardada", nil), [self logClassName:className]] important:NO];
         }
         
+        self.savedEntities = [NSMutableDictionary dictionary];
+        
         [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
         [self progressBlockIncrementInMainProcess:YES];
         
@@ -1113,6 +1106,8 @@ typedef void (^DownloadCompletionBlock)();
         [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
         [self progressBlockIncrementInMainProcess:YES];
     }
+    
+    self.JSONRecords = [NSMutableDictionary dictionary];
     
     [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
     
@@ -1548,9 +1543,10 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)cleanEngine
 {
+    [self.context reset];
     self.context = nil;
     self.JSONRecords = [NSMutableDictionary dictionary];
-    self.savedEntities = nil;
+    self.savedEntities = [NSMutableDictionary dictionary];
     self.dateFormatter = nil;
     self.classesToSync = nil;
     self.downloadQueue = nil;

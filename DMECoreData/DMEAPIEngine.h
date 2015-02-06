@@ -14,8 +14,6 @@ typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 
 @interface DMEAPIEngine : AFHTTPSessionManager
 
-@property (nonatomic) NSInteger haveConection;
-
 + (instancetype)sharedInstance;
 - (instancetype)initWithBaseURL:(NSURL *)url sessionConfiguration:(NSURLSessionConfiguration *)configuration;
 - (instancetype)initWithBaseURL:(NSURL *)url;

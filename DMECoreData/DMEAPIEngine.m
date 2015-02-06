@@ -95,6 +95,7 @@
     
     [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         completionBlock([((NSDictionary *)responseObject) allValues], nil);
+        responseObject = nil;
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completionBlock(nil, error);
     }];
@@ -112,6 +113,7 @@
     
     [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         completionBlock([((NSDictionary *)responseObject) objectForKey:@"sync_states"], nil);
+        responseObject = nil;
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completionBlock(nil, error);
     }];
@@ -138,6 +140,7 @@
     [self POST:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
             completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error", nil) code:6666 userInfo:@{}]);
@@ -171,6 +174,7 @@
     } success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
             completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
@@ -209,6 +213,7 @@
     } success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
             completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
@@ -236,6 +241,7 @@
     [self DELETE:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
         if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
             completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
         }
         else{
             completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error al borrar", nil) code:6686 userInfo:@{}]);
