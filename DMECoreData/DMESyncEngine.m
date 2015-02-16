@@ -599,7 +599,7 @@ typedef void (^DownloadCompletionBlock)();
 //Introduce un valor en una propiedad de un objeto Core Data
 - (void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject {
     //Si el objeto tiene esa propiedad
-    if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isFault]){
+    if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isDeleted]){
         //Si es nulo lo convertimos en nil
         if([value isKindOfClass:[NSNull class]]){
             value = nil;
@@ -1185,65 +1185,77 @@ typedef void (^DownloadCompletionBlock)();
                 
                 // Iterate over all fetched objects who syncStatus is equal to SDObjectCreated
                 for (NSManagedObject *objectToCreate in objectsToCreate) {
-                    // Get the JSON representation of the NSManagedObject
-                    NSDictionary *jsonString = [objectToCreate JSONToObjectOnServer];
-                    NSDictionary *filesURL = [objectToCreate filesURLToObjectOnServer];
                     
-                    if(jsonString && jsonString.count > 0){
-                        // Enter the group for each request we create
-                        dispatch_group_enter(groupGeneral);
+                    if(!objectToCreate.isDeleted){
+                        // Get the JSON representation of the NSManagedObject
+                        NSDictionary *jsonString = [objectToCreate JSONToObjectOnServer];
+                        NSDictionary *filesURL = [objectToCreate filesURLToObjectOnServer];
                         
-                        [[DMEAPIEngine sharedInstance] pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
-                            [self.context performBlock:^{
-                                if(!error){
-                                    if(object.count > 0){
-                                        for (NSString* key in object) {
-                                            if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
-                                                
-                                                //Obtenemos el nombre de la relacion
-                                                NSString *className2 = (NSString *)[className copy];
-                                                NSString *relationName = [self nameFromClassName:&className2 relation:key];
-                                                
-                                                //Obtenemos los objetos de la relacion
-                                                NSArray *objectsToUpdate = [(NSSet *)[objectToCreate valueForKey:relationName] allObjects];
-                                                
-                                                if(objectsToUpdate.count == [(NSArray *)[object objectForKey:key] count]){
-                                                    //Volvemos a crear los objetos
-                                                    NSInteger i = 0;
-                                                    for (NSDictionary *record in [object objectForKey:key]) {
-                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
-                                                            NSManagedObject *relationObject = [objectsToUpdate objectAtIndex:i];
-                                                            
-                                                            NSDate *createdDate = [self dateUsingStringFromAPI:[record valueForKey:@"created"]];
-                                                            NSDate *modifiedDate = [self dateUsingStringFromAPI:[record valueForKey:@"modified"]];
-                                                            [relationObject setValue:createdDate forKey:@"created"];
-                                                            [relationObject setValue:modifiedDate forKey:@"modified"];
-                                                            [relationObject setValue:[record valueForKey:@"id"] forKey:@"id"];
-                                                            [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
-                                                        }
-                                                        i++;
-                                                    }
-                                                }
-                                                
-                                                
-                                            }
-                                            else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
-                                                if([key isEqualToString:className]){
-                                                    NSDictionary *record = [object objectForKey:key];
+                        if(jsonString && jsonString.count > 0){
+                            // Enter the group for each request we create
+                            dispatch_group_enter(groupGeneral);
+                            
+                            [[DMEAPIEngine sharedInstance] pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                                [self.context performBlock:^{
+                                    if(!error){
+                                        if(object.count > 0){
+                                            for (NSString* key in object) {
+                                                if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
                                                     
-                                                    if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"] && [record valueForKey:@"modified"]){
-                                                        [self updateManagedObject:objectToCreate withClassName:className withRecord:@{className: record}];
-                                                        [objectToCreate setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                    //Obtenemos el nombre de la relacion
+                                                    NSString *className2 = (NSString *)[className copy];
+                                                    NSString *relationName = [self nameFromClassName:&className2 relation:key];
+                                                    
+                                                    //Obtenemos los objetos de la relacion
+                                                    NSArray *objectsToUpdate = [(NSSet *)[objectToCreate valueForKey:relationName] allObjects];
+                                                    
+                                                    if(objectsToUpdate.count == [(NSArray *)[object objectForKey:key] count]){
+                                                        //Volvemos a crear los objetos
+                                                        NSInteger i = 0;
+                                                        for (NSDictionary *record in [object objectForKey:key]) {
+                                                            if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
+                                                                NSManagedObject *relationObject = [objectsToUpdate objectAtIndex:i];
+                                                                
+                                                                NSDate *createdDate = [self dateUsingStringFromAPI:[record valueForKey:@"created"]];
+                                                                NSDate *modifiedDate = [self dateUsingStringFromAPI:[record valueForKey:@"modified"]];
+                                                                [relationObject setValue:createdDate forKey:@"created"];
+                                                                [relationObject setValue:modifiedDate forKey:@"modified"];
+                                                                [relationObject setValue:[record valueForKey:@"id"] forKey:@"id"];
+                                                                [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                            }
+                                                            i++;
+                                                        }
+                                                    }
+                                                    
+                                                    
+                                                }
+                                                else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
+                                                    if([key isEqualToString:className]){
+                                                        NSDictionary *record = [object objectForKey:key];
+                                                        
+                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"] && [record valueForKey:@"modified"]){
+                                                            [self updateManagedObject:objectToCreate withClassName:className withRecord:@{className: record}];
+                                                            [objectToCreate setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                        }
                                                     }
                                                 }
                                             }
+                                            
+                                            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha creado el %@ con id %@", nil), [self logClassName:[[objectToCreate entity] name]], [objectToCreate valueForKey:@"id"]] important:NO];
+                                            
+                                            [self saveContext:^(BOOL result) {
+                                                dispatch_group_leave(groupGeneral);
+                                            }];
                                         }
-                                        
-                                        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha creado el %@ con id %@", nil), [self logClassName:[[objectToCreate entity] name]], [objectToCreate valueForKey:@"id"]] important:NO];
-                                        
-                                        [self saveContext:^(BOOL result) {
+                                        else{
+                                            NSError *error = [self createErrorWithCode:SyncErrorCodeCreateInfo
+                                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido enviar el %@ al servidor", nil), [self logClassName:className]]
+                                                                      andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
+                                                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                                            [self errorBlock:error fatal:NO];
+                                            
                                             dispatch_group_leave(groupGeneral);
-                                        }];
+                                        }
                                     }
                                     else{
                                         NSError *error = [self createErrorWithCode:SyncErrorCodeCreateInfo
@@ -1254,18 +1266,9 @@ typedef void (^DownloadCompletionBlock)();
                                         
                                         dispatch_group_leave(groupGeneral);
                                     }
-                                }
-                                else{
-                                    NSError *error = [self createErrorWithCode:SyncErrorCodeCreateInfo
-                                                                andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido enviar el %@ al servidor", nil), [self logClassName:className]]
-                                                              andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
-                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                                    [self errorBlock:error fatal:NO];
-                                    
-                                    dispatch_group_leave(groupGeneral);
-                                }
+                                }];
                             }];
-                        }];
+                        }
                     }
                 }
                 
@@ -1328,44 +1331,57 @@ typedef void (^DownloadCompletionBlock)();
                 
                 // Iterate over all fetched objects who syncStatus is equal to SDObjectCreated
                 for (NSManagedObject *objectToModified in objectsToModified) {
-                    // Get the JSON representation of the NSManagedObject
-                    NSDictionary *jsonString = [objectToModified JSONToObjectOnServer];
-                    NSDictionary *filesURL = [objectToModified filesURLToObjectOnServer];
+                    NSString *objectId = [objectToModified valueForKey:@"id"];
                     
-                    if(jsonString && jsonString.count > 0){
-                        // Enter the group for each request we create
-                        dispatch_group_enter(groupGeneral);
+                    if(objectId && ![objectId isEqualToString:@""] && !objectToModified.isDeleted){
+                        // Get the JSON representation of the NSManagedObject
+                        NSDictionary *jsonString = [objectToModified JSONToObjectOnServer];
+                        NSDictionary *filesURL = [objectToModified filesURLToObjectOnServer];
                         
-                        [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
-                            [self.context performBlock:^{
-                                if(!error){
-                                    if(object.count > 0){
-                                        for (NSString* key in object) {
-                                            if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
-                                                for (NSDictionary *record in [object objectForKey:key]) {
-                                                    if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
-                                                        NSManagedObject *relationObject = [self updateRelation:className ofManagedObject:objectToModified withClassName:key withRecord:record];
-                                                        [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                        if(jsonString && jsonString.count > 0){
+                            // Enter the group for each request we create
+                            dispatch_group_enter(groupGeneral);
+                            
+                            [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                                [self.context performBlock:^{
+                                    if(!error){
+                                        if(object.count > 0){
+                                            for (NSString* key in object) {
+                                                if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
+                                                    for (NSDictionary *record in [object objectForKey:key]) {
+                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
+                                                            NSManagedObject *relationObject = [self updateRelation:className ofManagedObject:objectToModified withClassName:key withRecord:record];
+                                                            [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                        }
+                                                    }
+                                                }
+                                                else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
+                                                    if([key isEqualToString:className]){
+                                                        NSDictionary *record = [object objectForKey:key];
+                                                        
+                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"modified"]){
+                                                            [self updateManagedObject:objectToModified withClassName:className withRecord:@{className: record}];
+                                                            [objectToModified setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                        }
                                                     }
                                                 }
                                             }
-                                            else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
-                                                if([key isEqualToString:className]){
-                                                    NSDictionary *record = [object objectForKey:key];
-                                                    
-                                                    if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"modified"]){
-                                                        [self updateManagedObject:objectToModified withClassName:className withRecord:@{className: record}];
-                                                        [objectToModified setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
-                                                    }
-                                                }
-                                            }
+                                            
+                                            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha modificado el %@ con id %@", nil), [self logClassName:[[objectToModified entity] name]], [objectToModified valueForKey:@"id"]] important:NO];
+                                            
+                                            [self saveContext:^(BOOL result) {
+                                                dispatch_group_leave(groupGeneral);
+                                            }];
                                         }
-                                        
-                                        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha modificado el %@ con id %@", nil), [self logClassName:[[objectToModified entity] name]], [objectToModified valueForKey:@"id"]] important:NO];
-                                        
-                                        [self saveContext:^(BOOL result) {
+                                        else{
+                                            NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
+                                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido actualizar el %@ al servidor", nil), [self logClassName:className]]
+                                                                      andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
+                                                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                                            [self errorBlock:error fatal:NO];
+                                            
                                             dispatch_group_leave(groupGeneral);
-                                        }];
+                                        }
                                     }
                                     else{
                                         NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
@@ -1376,18 +1392,9 @@ typedef void (^DownloadCompletionBlock)();
                                         
                                         dispatch_group_leave(groupGeneral);
                                     }
-                                }
-                                else{
-                                    NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
-                                                                andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido actualizar el %@ al servidor", nil), [self logClassName:className]]
-                                                              andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
-                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                                    [self errorBlock:error fatal:NO];
-                                    
-                                    dispatch_group_leave(groupGeneral);
-                                }
+                                }];
                             }];
-                        }];
+                        }
                     }
                 }
                 
@@ -1454,7 +1461,7 @@ typedef void (^DownloadCompletionBlock)();
                 // Iterate over all fetched objects who syncStatus is equal to SDObjectCreated
                 for (NSManagedObject *objectToDelete in objectsToDelete) {
                     NSString *objectId = [objectToDelete valueForKey:@"id"];
-                    if(objectId && ![objectId isEqualToString:@""]){
+                    if(objectId && ![objectId isEqualToString:@""] && !objectToDelete.isDeleted){
                         // Enter the group for each request we create
                         dispatch_group_enter(groupGeneral);
                         
@@ -1543,7 +1550,6 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)cleanEngine
 {
-    [self.context reset];
     self.context = nil;
     self.JSONRecords = [NSMutableDictionary dictionary];
     self.savedEntities = [NSMutableDictionary dictionary];

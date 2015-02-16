@@ -122,7 +122,6 @@
     else{
         req.predicate = syncPredicate;
     }
-    req.fetchBatchSize = 100;
     
     //Crear un fetched results
     res = [[NSFetchedResultsController alloc] initWithFetchRequest:req managedObjectContext:aContext sectionNameKeyPath:key cacheName:nil];
