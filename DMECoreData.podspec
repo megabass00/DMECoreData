@@ -1,4 +1,4 @@
- ojoPod::Spec.new do |s|
+Pod::Spec.new do |s|
   s.name     = 'DMECoreData'
   s.version  = '0.2.0'
   s.license  = 'BSD'
