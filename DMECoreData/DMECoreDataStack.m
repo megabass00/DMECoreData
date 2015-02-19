@@ -8,7 +8,8 @@
 #import "DMECoreData.h"
 
 @interface DMECoreDataStack ()
-@property (strong, nonatomic, readonly) NSManagedObjectContext *privateContext;
+
+//@property (strong, nonatomic, readonly) NSManagedObjectContext *privateContext;
 @property (strong, nonatomic, readonly) NSManagedObjectModel *model;
 @property (strong, nonatomic, readonly) NSPersistentStoreCoordinator *storeCoordinator;
 @property (strong, nonatomic) NSURL *modelURL;
@@ -88,25 +89,26 @@ static DMECoreDataStack *sharedInstance = nil;
 @synthesize storeCoordinator=_storeCoordinator;
 @synthesize mainContext=_mainContext;
 @synthesize backgroundContext=_backgroundContext;
-@synthesize privateContext=_privateContext;
+//@synthesize privateContext=_privateContext;
 
--(NSManagedObjectContext *)privateContext{
+/*-(NSManagedObjectContext *)privateContext{
     //Creamos un solo contexto para guardar en el disco
     if (_privateContext == nil){
         _privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         _privateContext.persistentStoreCoordinator = self.storeCoordinator;
-        [_privateContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
+        [_privateContext setMergePolicy:NSMergeByPropertyStoreTrumpMergePolicy];
     }
     
     return _privateContext;
-}
+}*/
 
 
 -(NSManagedObjectContext *)mainContext{
     //Creamos un solo contexto para el hilo actual
     if (_mainContext == nil){
         _mainContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-        _mainContext.parentContext = [self privateContext];
+        //_mainContext.parentContext = [self privateContext];
+        _mainContext.persistentStoreCoordinator = self.storeCoordinator;
         [_mainContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
@@ -213,9 +215,9 @@ static DMECoreDataStack *sharedInstance = nil;
     // Core Data into an unknown and unstable state.
     _backgroundContext = nil;
     _mainContext = nil;
-    _privateContext = nil;
+    //_privateContext = nil;
     _storeCoordinator = nil;
-    [self privateContext];
+    //[self privateContext];
     [self mainContext]; // this will rebuild the stack
     [self backgroundContext]; // this will rebuild the stack
 }
@@ -234,9 +236,10 @@ static DMECoreDataStack *sharedInstance = nil;
         }
         else if (self.mainContext.hasChanges) {
             success = [self.mainContext save:&err];
-            if (success && !err) {
+            completionBlock(success, err);
+            /*if (success && !err) {
                 //Guardamos el contexto que escribe en disco
-                [self.privateContext performBlock:^{
+                [self.privateContext performBlockAndWait:^{
                     if (!_privateContext) {
                         err = [NSError errorWithDomain:@"com.damarte.coredata"
                                                   code:1
@@ -254,7 +257,7 @@ static DMECoreDataStack *sharedInstance = nil;
             }
             else{
                 completionBlock(NO, err);
-            }
+            }*/
         }
         else{
             completionBlock(NO, err);
