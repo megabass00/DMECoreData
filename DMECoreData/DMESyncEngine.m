@@ -322,7 +322,7 @@ typedef void (^DownloadCompletionBlock)();
         self.errorBlock = errorBlock;
         
         [self executeSyncStartOperations:^{
-            [self progressBlockTotal:self.downloadFiles ? 1 : 0 inMainProcess:YES];
+            [self progressBlockTotal:1 inMainProcess:YES];
             
             ///Enviamos los datos
             [self downloadFiles:^{
@@ -1093,8 +1093,8 @@ typedef void (^DownloadCompletionBlock)();
             // Schedule the NSManagedObject for deletion
             for (NSManagedObject *managedObject in storedRecords) {
                 [self logDebug:@"   Deleted %@", className];
-                [self.context performBlockAndWait:^{
-                    [managedObjectContext deleteObject:managedObject];
+                [managedObjectContext performBlockAndWait:^{
+                    [managedObjectContext deleteObject:[managedObject objectInContext:managedObjectContext]];
                 }];
             }
             
@@ -1343,7 +1343,7 @@ typedef void (^DownloadCompletionBlock)();
                             dispatch_group_enter(groupGeneral);
                             
                             [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
-                                [self.context performBlock:^{
+                                [self.context performBlockAndWait:^{
                                     if(!error){
                                         if(object.count > 0){
                                             for (NSString* key in object) {
@@ -1512,11 +1512,11 @@ typedef void (^DownloadCompletionBlock)();
 //Comienza la descarga de ficheros
 - (void)downloadFiles:(DownloadCompletionBlock)completionBlock
 {
-    [self.context performBlock:^{
+    [self.context performBlockAndWait:^{
         //Comprobamos que hay que hacer
         if(!self.downloadFiles){
-            
             [self messageBlock:NSLocalizedString(@"La descarga de ficheros esta desactivada", nil) important:YES];
+            [self progressBlockIncrementInMainProcess:YES];
             
             if(completionBlock){
                 completionBlock();
@@ -1899,9 +1899,12 @@ typedef void (^DownloadCompletionBlock)();
     }
     self.progressSubprocessCurrent = 0;
     
+    CGFloat current = self.progressCurrent;
+    CGFloat totalAux = (CGFloat)self.progressTotal;
+    
     if(self.progressBlock){
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.progressBlock(self.progressCurrent, self.progressTotal);
+            self.progressBlock(current, totalAux);
         });
     }
 }
@@ -1909,6 +1912,7 @@ typedef void (^DownloadCompletionBlock)();
 -(void)progressBlockIncrementInMainProcess:(BOOL)main
 {
     CGFloat current = 0;
+    CGFloat total = self.progressTotal;
     if(main){
         self.progressCurrent += 1;
         self.progressSubprocessCurrent = 0;
@@ -1923,7 +1927,7 @@ typedef void (^DownloadCompletionBlock)();
     
     if(self.progressBlock){
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.progressBlock(current, self.progressTotal);
+            self.progressBlock(current, total);
         });
     }
 }
