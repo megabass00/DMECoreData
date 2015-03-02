@@ -443,11 +443,14 @@ typedef void (^DownloadCompletionBlock)();
         }
     }
     
-    if(![self.savedEntities objectForKey:className]){
-        [self.savedEntities setObject:[NSMutableDictionary dictionary] forKey:className];
+    if(!self.initialSyncComplete){
+        if(![self.savedEntities objectForKey:className]){
+            [self.savedEntities setObject:[NSMutableDictionary dictionary] forKey:className];
+        }
+        
+        [[self.savedEntities objectForKey:className] setObject:newManagedObject forKey:[[record objectForKey:className] objectForKey:@"id"]];
     }
     
-    [[self.savedEntities objectForKey:className] setObject:newManagedObject forKey:[[record objectForKey:className] objectForKey:@"id"]];
     [self logDebug:@"   Saved %@ with id: %@", className, [[record objectForKey:className] objectForKey:@"id"]];
     return newManagedObject;
 }
@@ -485,7 +488,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Vacia una relacion
--(void) truncateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className {
+-(void)truncateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className {
     //Obtenemos el nombre de la relacion
     NSString *relationName = [self nameFromClassName:&className relation:relation];
     
@@ -498,16 +501,26 @@ typedef void (^DownloadCompletionBlock)();
         return [[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:className];
     }]] firstObject] name];
     
-    //Comprobamos si la relacion es a uno o a varios
-    if([relationsDictionary objectForKey:inverseRelationName]){
-        if([managedObject valueForKey:inverseRelationName]){
-            [managedObject setValue:nil forKey:inverseRelationName];
+    //Comprobamos que exista la relación
+    NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
+    if(relationDescription && [managedObject valueForKey:inverseRelationName]){
+        //Comprobamos si la relacion es a uno o a varios
+        if(relationDescription.isToMany){
+            //Eliminamos los objetos de la relación
+            for (NSManagedObject *relationObject in [managedObject valueForKey:inverseRelationName]) {
+                [relationObject deleteEntityInContext:self.context];
+            }
+        }
+        else{
+            //Ponemos la relación a nil
+            NSManagedObject *relationObject = [managedObject valueForKey:inverseRelationName];
+            [relationObject deleteEntityInContext:self.context];
         }
     }
 }
 
 //Actualiza las relaciones de un objeto Core Data a partir del JSON
-- (NSManagedObject *) updateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record {
+- (NSManagedObject *)updateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record {
     NSManagedObject *newRelationManagedObject = nil;
     
     if(![[record objectForKey:@"id"] isKindOfClass:[NSNull class]]){
@@ -515,17 +528,17 @@ typedef void (^DownloadCompletionBlock)();
         NSString *relationName = [self nameFromClassName:&className relation:relation];
         
         if(self.initialSyncComplete){
-            newRelationManagedObject = [self managedObjectForClass:className withId:[record objectForKey:@"id"]];
+            newRelationManagedObject = [[self managedObjectForClass:className withId:[record objectForKey:@"id"]] objectInContext:self.context];
         }
         else{
-            newRelationManagedObject = [[self.savedEntities objectForKey:className] objectForKey:[record objectForKey:@"id"]];
+            newRelationManagedObject = [[[self.savedEntities objectForKey:className] objectForKey:[record objectForKey:@"id"]] objectInContext:self.context];
         }
         
         if(!newRelationManagedObject){
-            newRelationManagedObject = [self newManagedObjectWithClassName:className forRecord:[NSDictionary dictionaryWithObject:record forKey:className]];
+            newRelationManagedObject = [[self newManagedObjectWithClassName:className forRecord:[NSDictionary dictionaryWithObject:record forKey:className]] objectInContext:self.context];
         }
         else{
-            newRelationManagedObject = [self updateManagedObject:newRelationManagedObject withClassName:className withRecord:[NSDictionary dictionaryWithObject:record forKey:className]];
+            newRelationManagedObject = [[self updateManagedObject:newRelationManagedObject withClassName:className withRecord:[NSDictionary dictionaryWithObject:record forKey:className]] objectInContext:self.context];
         }
         
         //Comprobamos si la relacion es a uno o a varios
@@ -540,18 +553,18 @@ typedef void (^DownloadCompletionBlock)();
                     SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", className]);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                    [managedObject performSelector:selector withObject:[newRelationManagedObject objectInContext:managedObject.managedObjectContext]];
+                    [[managedObject objectInContext:self.context] performSelector:selector withObject:newRelationManagedObject];
 #pragma clang diagnostic pop
                 }
                 else{
                     //Obtenemos la relacion inversa
                     relationName = [[[relationsDictionary objectForKey:relationName] inverseRelationship] name];
                     
-                    [managedObject setValue:[newRelationManagedObject objectInContext:managedObject.managedObjectContext] forKey:relationName];
+                    [[managedObject objectInContext:self.context] setValue:newRelationManagedObject forKey:relationName];
                 }
             }
             else{
-                [newRelationManagedObject setValue:[managedObject objectInContext:newRelationManagedObject.managedObjectContext] forKey:relationName];
+                [newRelationManagedObject setValue:[managedObject objectInContext:self.context] forKey:relationName];
             }
             [self logDebug:@"   Updated relation %@ with id: %@", relationName, [record objectForKey:@"id"]];
         }
@@ -572,8 +585,8 @@ typedef void (^DownloadCompletionBlock)();
         //Comprobamos si la relacion es a uno o a varios
         if([relationsDictionary objectForKey:inverseRelationName]){
             if(![[relationsDictionary objectForKey:inverseRelationName] isToMany]){
-                if([managedObject valueForKey:inverseRelationName]){
-                    [managedObject setValue:nil forKey:inverseRelationName];
+                if([[managedObject objectInContext:self.context] valueForKey:inverseRelationName]){
+                    [[managedObject objectInContext:self.context] setValue:nil forKey:inverseRelationName];
                 }
             }
         }
@@ -648,15 +661,14 @@ typedef void (^DownloadCompletionBlock)();
 
 //Obtiene todos los objetos Core Data que tengan un estado de sincronizacion determinado
 - (NSArray *)managedObjectsForClass:(NSString *)className withSyncStatus:(ObjectSyncStatus)syncStatus {
-    __block NSArray *results = nil;
-    NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
     [fetchRequest setPredicate:[[self syncStatusPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:syncStatus]}]];
     
+    __block NSArray *results = nil;
     [self.context performBlockAndWait:^{
         NSError *error = nil;
-        results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+        results = [self.context executeFetchRequest:fetchRequest error:&error];
     }];
     
     return results;
@@ -664,7 +676,6 @@ typedef void (^DownloadCompletionBlock)();
 
 //Obtiene todos los objetos Core Data que NO tengan un estado de sincronizacion determinado
 - (NSArray *)managedObjectsForClass:(NSString *)className withPredicate:(NSPredicate *)predicate {
-    NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
     if(predicate != nil){
@@ -674,7 +685,7 @@ typedef void (^DownloadCompletionBlock)();
     __block NSArray *objects = nil;
     [self.context performBlockAndWait:^{
         NSError *error = nil;
-        objects = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+        objects = [self.context executeFetchRequest:fetchRequest error:&error];
     }];
     
     return objects;
@@ -684,9 +695,24 @@ typedef void (^DownloadCompletionBlock)();
     return [self managedObjectsForClass:className withPredicate:nil];
 }
 
+//Comprueba si existe un objeto
+- (BOOL)existsManagedObjectForClass:(NSString *)className withId:(NSString *)aId {
+    NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
+    [fetchRequest setFetchLimit:1];
+    [fetchRequest setPredicate:[[self idPredicateTemplate] predicateWithSubstitutionVariables:@{@"ID": aId}]];
+    
+    __block NSUInteger count = nil;
+    [self.context performBlockAndWait:^{
+        NSError *error = nil;
+        count = [self.context countForFetchRequest:fetchRequest error:&error];
+    }];
+    
+    return count > 0;
+}
+
+
 //Obtiene el objeto Core Data con un id
 - (NSManagedObject *)managedObjectForClass:(NSString *)className withId:(NSString *)aId {
-    NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     [fetchRequest setFetchLimit:1];
     [fetchRequest setPredicate:[[self idPredicateTemplate] predicateWithSubstitutionVariables:@{@"ID": aId}]];
@@ -694,7 +720,7 @@ typedef void (^DownloadCompletionBlock)();
     __block NSManagedObject *object = nil;
     [self.context performBlockAndWait:^{
         NSError *error = nil;
-        object = [[managedObjectContext executeFetchRequest:fetchRequest error:&error] lastObject];
+        object = [[self.context executeFetchRequest:fetchRequest error:&error] lastObject];
     }];
     
     return object;
@@ -702,8 +728,6 @@ typedef void (^DownloadCompletionBlock)();
 
 //Obtiene los objetos Core Data de un tipo que esten en el array de ids
 - (NSArray *)managedObjectsForClass:(NSString *)className sortedByKey:(NSString *)key usingArrayOfIds:(NSArray *)idArray inArrayOfIds:(BOOL)inIds {
-    __block NSArray *results = nil;
-    NSManagedObjectContext *managedObjectContext = self.context;
     NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
     NSPredicate *predicate;
     //TODO Optimizar a fuego
@@ -716,12 +740,12 @@ typedef void (^DownloadCompletionBlock)();
     NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:syncPredicate, predicate, nil]];
     
     [fetchRequest setPredicate:andPredicate];
-    [fetchRequest setReturnsObjectsAsFaults:YES];
     [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
     
+    __block NSArray *results = nil;
     [self.context performBlockAndWait:^{
         NSError *error = nil;
-        results = [managedObjectContext executeFetchRequest:fetchRequest error:&error];
+        results = [self.context executeFetchRequest:fetchRequest error:&error];
     }];
     
     return results;
@@ -943,127 +967,123 @@ typedef void (^DownloadCompletionBlock)();
         // Here we wait for all the requests to finish
         dispatch_group_notify(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
             [self progressBlockIncrementInMainProcess:YES];
-            [self.context performBlock:^{
-                if(!errorSync){
-                    // Do whatever you need to do when all requests are finished
-                    [self messageBlock:NSLocalizedString(@"Descargada toda la información", nil) important:YES];
-                    
-                    [self processJSONDataRecordsIntoCoreData:completionBlock];
-                }
-                else{
-                    [self errorBlock:errorSync fatal:YES];
-                    
-                    [self executeSyncErrorOperations];
-                }
-            }];
+            if(!errorSync){
+                // Do whatever you need to do when all requests are finished
+                [self messageBlock:NSLocalizedString(@"Descargada toda la información", nil) important:YES];
+                
+                [self processJSONDataRecordsIntoCoreData:completionBlock];
+            }
+            else{
+                [self errorBlock:errorSync fatal:YES];
+                
+                [self executeSyncErrorOperations];
+            }
         });
     }];
 }
 
 - (void)processJSONDataRecordsIntoCoreData:(RecieveObjectsCompletionBlock)completionBlock {
-    [self.context performBlock:^{
-        NSMutableDictionary *JSONData = [NSMutableDictionary dictionary];
+    NSMutableDictionary *JSONData = [NSMutableDictionary dictionary];
+    
+    // Calculamos el progreso
+    NSInteger total = 0;
+    for (NSString *className in self.classesToSync) {
         
-        // Calculamos el progreso
-        NSInteger total = 0;
-        for (NSString *className in self.classesToSync) {
-            
-            if (![self initialSyncComplete]){
-                // If this is the initial sync then the logic is pretty simple, you will fetch the JSON data from disk
-                // for the class of the current iteration and create new NSManagedObjects for each record
-                [JSONData setObject:[self JSONArrayForClassWithName:className] forKey:className];
-            }
-            else{
-                // Otherwise you need to do some more logic to determine if the record is new or has been updated.
-                // First get the downloaded records from the JSON response, verify there is at least one object in
-                // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
-                [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id"] forKey:className];
-            }
-            total += [(NSArray *)[JSONData objectForKey:className] count];
+        if (![self initialSyncComplete]){
+            // If this is the initial sync then the logic is pretty simple, you will fetch the JSON data from disk
+            // for the class of the current iteration and create new NSManagedObjects for each record
+            [JSONData setObject:[self JSONArrayForClassWithName:className] forKey:className];
         }
+        else{
+            // Otherwise you need to do some more logic to determine if the record is new or has been updated.
+            // First get the downloaded records from the JSON response, verify there is at least one object in
+            // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
+            [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id"] forKey:className];
+        }
+        total += [(NSArray *)[JSONData objectForKey:className] count];
+    }
+    
+    [self progressBlockTotal:total inMainProcess:NO];
+    
+    // Iterate over all registered classes to sync
+    for (NSString *className in self.classesToSync) {
+        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Guardando información de %@ (%@ objetos)...", nil), [self logClassName:className], [NSNumber numberWithInteger:[[JSONData objectForKey:className] count]]] important:NO];
         
-        [self progressBlockTotal:total inMainProcess:NO];
-        
-        // Iterate over all registered classes to sync
-        for (NSString *className in self.classesToSync) {
-            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Guardando información de %@ (%@ objetos)...", nil), [self logClassName:className], [NSNumber numberWithInteger:[[JSONData objectForKey:className] count]]] important:NO];
+        if (![self initialSyncComplete]) { // import all downloaded data to Core Data for initial sync
+            for (NSDictionary *record in [JSONData objectForKey:className]) {
+                NSManagedObject *managedObject = [[self.savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
+                if(!managedObject){
+                    [self newManagedObjectWithClassName:className forRecord:record];
+                }
+                else{
+                    [self updateManagedObject:managedObject withClassName:className withRecord:record];
+                }
+                
+                [self progressBlockIncrementInMainProcess:NO];
+            }
+        }
+        else {
+            NSArray *storedManagedObjects = [self managedObjectsForClass:className withPredicate:[NSPredicate predicateWithFormat:@"id != nil"]];
             
-            if (![self initialSyncComplete]) { // import all downloaded data to Core Data for initial sync
-                for (NSDictionary *record in [JSONData objectForKey:className]) {
-                    NSManagedObject *managedObject = [[self.savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
-                    if(!managedObject){
-                        [self newManagedObjectWithClassName:className forRecord:record];
+            NSEnumerator *JSONEnumerator = [[JSONData objectForKey:className] objectEnumerator];
+            NSEnumerator *fetchResultsEnumerator = [storedManagedObjects objectEnumerator];
+            
+            NSDictionary *record = [JSONEnumerator nextObject];
+            NSManagedObject *storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+            
+            while (record) {
+                NSString *id = nil;
+                
+                if([[record objectForKey:className] isKindOfClass:[NSDictionary class]]){
+                    id = [[record objectForKey:className] valueForKey:@"id"];
+                }
+                
+                if(id && ![id isEqualToString:@""]){
+                    if([id isEqualToString:[storedManagedObject valueForKey:@"id"]]){
+                        if([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending){
+                            [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
+                        }
+                        
+                        //Avanzamos ambos cursores
+                        record = [JSONEnumerator nextObject];
+                        storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+                        
+                        [self progressBlockIncrementInMainProcess:NO];
                     }
                     else{
-                        [self updateManagedObject:managedObject withClassName:className withRecord:record];
-                    }
-                    
-                    [self progressBlockIncrementInMainProcess:NO];
-                }
-            }
-            else {
-                NSArray *storedManagedObjects = [self managedObjectsForClass:className withPredicate:[NSPredicate predicateWithFormat:@"id != nil"]];
-                
-                NSEnumerator *JSONEnumerator = [[JSONData objectForKey:className] objectEnumerator];
-                NSEnumerator *fetchResultsEnumerator = [storedManagedObjects objectEnumerator];
-                
-                NSDictionary *record = [JSONEnumerator nextObject];
-                NSManagedObject *storedManagedObject = [fetchResultsEnumerator nextObject];
-                
-                while (record) {
-                    NSString *id = nil;
-                    
-                    if([[record objectForKey:className] isKindOfClass:[NSDictionary class]]){
-                        id = [[record objectForKey:className] valueForKey:@"id"];
-                    }
-                    
-                    if(id && ![id isEqualToString:@""]){
-                        if([id isEqualToString:[storedManagedObject valueForKey:@"id"]]){
-                            if([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending){
-                                [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
-                            }
-                            
-                            //Avanzamos ambos cursores
+                        if([self existsManagedObjectForClass:className withId:id]){
+                            storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+                        }
+                        else{
+                            [self newManagedObjectWithClassName:className forRecord:record];
                             record = [JSONEnumerator nextObject];
-                            storedManagedObject = [fetchResultsEnumerator nextObject];
                             
                             [self progressBlockIncrementInMainProcess:NO];
                         }
-                        else{
-                            if([self managedObjectForClass:className withId:id]){
-                                storedManagedObject = [fetchResultsEnumerator nextObject];
-                            }
-                            else{
-                                [self newManagedObjectWithClassName:className forRecord:record];
-                                record = [JSONEnumerator nextObject];
-                                
-                                [self progressBlockIncrementInMainProcess:NO];
-                            }
-                        }
-                    }
-                    else{
-                        NSError *errorSync = [self createErrorWithCode:SyncErrorCodeNoId
-                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada de %@ no tiene ID", nil), [self logClassName:className]]
-                                                      andFailureReason:NSLocalizedString(@"La entidad descargada no tiene ID", nil)
-                                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                        [self errorBlock:errorSync fatal:YES];
-                        [self executeSyncErrorOperations];
-                        
-                        return;
                     }
                 }
+                else{
+                    NSError *errorSync = [self createErrorWithCode:SyncErrorCodeNoId
+                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada de %@ no tiene ID", nil), [self logClassName:className]]
+                                                  andFailureReason:NSLocalizedString(@"La entidad descargada no tiene ID", nil)
+                                             andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                    [self errorBlock:errorSync fatal:YES];
+                    [self executeSyncErrorOperations];
+                    
+                    return;
+                }
             }
-            
-            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ guardada", nil), [self logClassName:className]] important:NO];
         }
         
-        self.savedEntities = [NSMutableDictionary dictionary];
-        
-        [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
-        [self progressBlockIncrementInMainProcess:YES];
-        
-        [self processJSONDataRecordsForDeletion:completionBlock];
-    }];
+        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ guardada", nil), [self logClassName:className]] important:NO];
+    }
+    
+    self.savedEntities = [NSMutableDictionary dictionary];
+    
+    [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
+    [self progressBlockIncrementInMainProcess:YES];
+    
+    [self processJSONDataRecordsForDeletion:completionBlock];
 }
 
 - (void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock {
@@ -1094,7 +1114,7 @@ typedef void (^DownloadCompletionBlock)();
             for (NSManagedObject *managedObject in storedRecords) {
                 [self logDebug:@"   Deleted %@", className];
                 [managedObjectContext performBlockAndWait:^{
-                    [managedObjectContext deleteObject:[managedObject objectInContext:managedObjectContext]];
+                    [managedObjectContext deleteObject:managedObject];
                 }];
             }
             
@@ -1207,7 +1227,7 @@ typedef void (^DownloadCompletionBlock)();
                                                     NSString *relationName = [self nameFromClassName:&className2 relation:key];
                                                     
                                                     //Obtenemos los objetos de la relacion
-                                                    NSArray *objectsToUpdate = [(NSSet *)[objectToCreate valueForKey:relationName] allObjects];
+                                                    NSArray *objectsToUpdate = [(NSSet *)[[objectToCreate objectInContext:self.context] valueForKey:relationName] allObjects];
                                                     
                                                     if(objectsToUpdate.count == [(NSArray *)[object objectForKey:key] count]){
                                                         //Volvemos a crear los objetos
@@ -1234,14 +1254,14 @@ typedef void (^DownloadCompletionBlock)();
                                                         NSDictionary *record = [object objectForKey:key];
                                                         
                                                         if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"] && [record valueForKey:@"modified"]){
-                                                            [self updateManagedObject:objectToCreate withClassName:className withRecord:@{className: record}];
-                                                            [objectToCreate setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                            [self updateManagedObject:[objectToCreate objectInContext:self.context] withClassName:className withRecord:@{className: record}];
+                                                            [[objectToCreate objectInContext:self.context] setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
                                                         }
                                                     }
                                                 }
                                             }
                                             
-                                            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha creado el %@ con id %@", nil), [self logClassName:[[objectToCreate entity] name]], [objectToCreate valueForKey:@"id"]] important:NO];
+                                            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha creado el %@ con id %@", nil), [self logClassName:[[[objectToCreate objectInContext:self.context] entity] name]], [[objectToCreate objectInContext:self.context] valueForKey:@"id"]] important:NO];
                                             
                                             [self saveContext:^(BOOL result) {
                                                 dispatch_group_leave(groupGeneral);
@@ -1279,11 +1299,15 @@ typedef void (^DownloadCompletionBlock)();
                 });
             }
             else{
-                [self postLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+                [self.context performBlock:^{
+                    [self postLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+                }];
             }
         }
         else{
-            [self postLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+            [self.context performBlock:^{
+                [self postLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+            }];
         }
     }
 }
@@ -1331,47 +1355,58 @@ typedef void (^DownloadCompletionBlock)();
                 
                 // Iterate over all fetched objects who syncStatus is equal to SDObjectCreated
                 for (NSManagedObject *objectToModified in objectsToModified) {
-                    NSString *objectId = [objectToModified valueForKey:@"id"];
-                    
-                    if(objectId && ![objectId isEqualToString:@""] && !objectToModified.isDeleted){
-                        // Get the JSON representation of the NSManagedObject
-                        NSDictionary *jsonString = [objectToModified JSONToObjectOnServer];
-                        NSDictionary *filesURL = [objectToModified filesURLToObjectOnServer];
+                    if(!objectToModified.isDeleted){
+                        NSString *objectId = [objectToModified valueForKey:@"id"];
                         
-                        if(jsonString && jsonString.count > 0){
-                            // Enter the group for each request we create
-                            dispatch_group_enter(groupGeneral);
+                        if(objectId && ![objectId isEqualToString:@""] && !objectToModified.isDeleted){
+                            // Get the JSON representation of the NSManagedObject
+                            NSDictionary *jsonString = [objectToModified JSONToObjectOnServer];
+                            NSDictionary *filesURL = [objectToModified filesURLToObjectOnServer];
                             
-                            [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
-                                [self.context performBlockAndWait:^{
-                                    if(!error){
-                                        if(object.count > 0){
-                                            for (NSString* key in object) {
-                                                if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
-                                                    for (NSDictionary *record in [object objectForKey:key]) {
-                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
-                                                            NSManagedObject *relationObject = [self updateRelation:className ofManagedObject:objectToModified withClassName:key withRecord:record];
-                                                            [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                            if(jsonString && jsonString.count > 0){
+                                // Enter the group for each request we create
+                                dispatch_group_enter(groupGeneral);
+                                
+                                [[DMEAPIEngine sharedInstance] updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                                    [self.context performBlockAndWait:^{
+                                        if(!error){
+                                            if(object.count > 0){
+                                                for (NSString* key in object) {
+                                                    if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
+                                                        for (NSDictionary *record in [object objectForKey:key]) {
+                                                            if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"created"]){
+                                                                NSManagedObject *relationObject = [self updateRelation:className ofManagedObject:[objectToModified objectInContext:self.context] withClassName:key withRecord:record];
+                                                                [relationObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                            }
+                                                        }
+                                                    }
+                                                    else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
+                                                        if([key isEqualToString:className]){
+                                                            NSDictionary *record = [object objectForKey:key];
+                                                            
+                                                            if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"modified"]){
+                                                                [self updateManagedObject:[objectToModified objectInContext:self.context] withClassName:className withRecord:@{className: record}];
+                                                                [[objectToModified objectInContext:self.context] setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
+                                                            }
                                                         }
                                                     }
                                                 }
-                                                else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
-                                                    if([key isEqualToString:className]){
-                                                        NSDictionary *record = [object objectForKey:key];
-                                                        
-                                                        if(record.count > 0 && [record valueForKey:@"id"] && [record valueForKey:@"modified"]){
-                                                            [self updateManagedObject:objectToModified withClassName:className withRecord:@{className: record}];
-                                                            [objectToModified setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
-                                                        }
-                                                    }
-                                                }
+                                                
+                                                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha modificado el %@ con id %@", nil), [self logClassName:[[[objectToModified objectInContext:self.context] entity] name]], [[objectToModified objectInContext:self.context] valueForKey:@"id"]] important:NO];
+                                                
+                                                [self saveContext:^(BOOL result) {
+                                                    dispatch_group_leave(groupGeneral);
+                                                }];
                                             }
-                                            
-                                            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha modificado el %@ con id %@", nil), [self logClassName:[[objectToModified entity] name]], [objectToModified valueForKey:@"id"]] important:NO];
-                                            
-                                            [self saveContext:^(BOOL result) {
+                                            else{
+                                                NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
+                                                                            andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido actualizar el %@ al servidor", nil), [self logClassName:className]]
+                                                                          andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
+                                                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                                                [self errorBlock:error fatal:NO];
+                                                
                                                 dispatch_group_leave(groupGeneral);
-                                            }];
+                                            }
                                         }
                                         else{
                                             NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
@@ -1382,18 +1417,9 @@ typedef void (^DownloadCompletionBlock)();
                                             
                                             dispatch_group_leave(groupGeneral);
                                         }
-                                    }
-                                    else{
-                                        NSError *error = [self createErrorWithCode:SyncErrorCodeModifyInfo
-                                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido actualizar el %@ al servidor", nil), [self logClassName:className]]
-                                                                  andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
-                                                             andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                                        [self errorBlock:error fatal:NO];
-                                        
-                                        dispatch_group_leave(groupGeneral);
-                                    }
+                                    }];
                                 }];
-                            }];
+                            }
                         }
                     }
                 }
@@ -1405,11 +1431,15 @@ typedef void (^DownloadCompletionBlock)();
                 });
             }
             else{
-                [self updateLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+                [self.context performBlock:^{
+                    [self updateLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+                }];
             }
         }
         else{
-            [self updateLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+            [self.context performBlock:^{
+                [self updateLocalObjectsToServerOfClassWithId:index+1 completionBlock:completionBlock];
+            }];
         }
     }
 }
@@ -1460,34 +1490,37 @@ typedef void (^DownloadCompletionBlock)();
                 
                 // Iterate over all fetched objects who syncStatus is equal to SDObjectCreated
                 for (NSManagedObject *objectToDelete in objectsToDelete) {
-                    NSString *objectId = [objectToDelete valueForKey:@"id"];
-                    if(objectId && ![objectId isEqualToString:@""] && !objectToDelete.isDeleted){
-                        // Enter the group for each request we create
-                        dispatch_group_enter(groupGeneral);
+                    if(!objectToDelete.isDeleted){
+                        NSString *objectId = [objectToDelete valueForKey:@"id"];
                         
-                        [[DMEAPIEngine sharedInstance] deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
-                            [self.context performBlock:^{
-                                if(!error && object.count > 0 && [[object objectForKey:className] valueForKey:@"id"]){
-                                    //Delete object in Core Data
-                                    [self.context deleteObject:objectToDelete];
-                                    
-                                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha eliminado el %@ con id %@", nil), [self logClassName:[[objectToDelete entity] name]], [objectToDelete valueForKey:@"id"]] important:NO];
-                                    
-                                    [self saveContext:^(BOOL result) {
+                        if(objectId && ![objectId isEqualToString:@""] && !objectToDelete.isDeleted){
+                            // Enter the group for each request we create
+                            dispatch_group_enter(groupGeneral);
+                            
+                            [[DMEAPIEngine sharedInstance] deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
+                                [self.context performBlockAndWait:^{
+                                    if(!error && object.count > 0 && [[object objectForKey:className] valueForKey:@"id"]){
+                                        //Delete object in Core Data
+                                        [self.context deleteObject:[objectToDelete objectInContext:self.context]];
+                                        
+                                        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Se ha eliminado el %@ con id %@", nil), [self logClassName:[[[objectToDelete objectInContext:self.context] entity] name]], [[objectToDelete objectInContext:self.context] valueForKey:@"id"]] important:NO];
+                                        
+                                        [self saveContext:^(BOOL result) {
+                                            dispatch_group_leave(groupGeneral);
+                                        }];
+                                    }
+                                    else{
+                                        NSError *error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
+                                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido eliminar el %@ al servidor", nil), [self logClassName:className]]
+                                                                  andFailureReason:NSLocalizedString(@"Ha fallado el borrado de datos en el servidor", nil)
+                                                             andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                                        [self errorBlock:error fatal:NO];
+                                        
                                         dispatch_group_leave(groupGeneral);
-                                    }];
-                                }
-                                else{
-                                    NSError *error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
-                                                                andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido eliminar el %@ al servidor", nil), [self logClassName:className]]
-                                                              andFailureReason:NSLocalizedString(@"Ha fallado el borrado de datos en el servidor", nil)
-                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                                    [self errorBlock:error fatal:NO];
-                                    
-                                    dispatch_group_leave(groupGeneral);
-                                }
+                                    }
+                                }];
                             }];
-                        }];
+                        }
                     }
                 }
                 
@@ -1498,11 +1531,15 @@ typedef void (^DownloadCompletionBlock)();
                 });
             }
             else{
-                [self deleteObjectsOnServerOfClassWithId:index+1 completionBlock:completionBlock];
+                [self.context performBlock:^{
+                    [self deleteObjectsOnServerOfClassWithId:index+1 completionBlock:completionBlock];
+                }];
             }
         }
         else{
-            [self deleteObjectsOnServerOfClassWithId:index+1 completionBlock:completionBlock];
+            [self.context performBlock:^{
+                [self deleteObjectsOnServerOfClassWithId:index+1 completionBlock:completionBlock];
+            }];
         }
     }
 }
