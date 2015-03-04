@@ -462,23 +462,23 @@ typedef void (^DownloadCompletionBlock)();
         //Si es el objeto principal lo actualizamos
         if([className isEqualToString:key]){
             [[record objectForKey:className] enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
-                [self setValue:obj forKey:key forManagedObject:managedObject];
+                [self setValue:obj forKey:key forManagedObject:[managedObject objectInContext:self.context]];
             }];
         }
         else if([[record objectForKey:key] isKindOfClass:[NSDictionary class]]){ //Si es otro objeto comprobamos actualizamos la relacion
             //Creamos la relacion con el objeto principal
-            [self updateRelation:className ofManagedObject:managedObject withClassName:key withRecord:[record objectForKey:key]];
+            [self updateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key withRecord:[record objectForKey:key]];
         }
         else if([[record objectForKey:key] isKindOfClass:[NSArray class]]){ //Relación con varios objetos
             
             if(self.initialSyncComplete){
                 //Vaciamos la relacion multiple
-                [self truncateRelation:className ofManagedObject:managedObject withClassName:key];
+                [self truncateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key];
                 
                 //Volvemos a crearla
                 for(NSDictionary *relationObject in [record objectForKey:key]){
                     //Creamos la relacion con el objeto principal
-                    [self updateRelation:className ofManagedObject:managedObject withClassName:key withRecord:relationObject];
+                    [self updateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key withRecord:relationObject];
                 }
             }
         }
@@ -493,7 +493,7 @@ typedef void (^DownloadCompletionBlock)();
     NSString *relationName = [self nameFromClassName:&className relation:relation];
     
     //Comprobamos si la relacion es a uno o a varios
-    NSEntityDescription *entityDescription = [managedObject entity];
+    NSEntityDescription *entityDescription = [[managedObject objectInContext:self.context] entity];
     NSDictionary *relationsDictionary = [entityDescription relationshipsByName];
     
     NSString *inverseRelationName = [[[[relationsDictionary allValues] filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
@@ -503,17 +503,17 @@ typedef void (^DownloadCompletionBlock)();
     
     //Comprobamos que exista la relación
     NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
-    if(relationDescription && [managedObject valueForKey:inverseRelationName]){
+    if(relationDescription && [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]){
         //Comprobamos si la relacion es a uno o a varios
         if(relationDescription.isToMany){
             //Eliminamos los objetos de la relación
-            for (NSManagedObject *relationObject in [managedObject valueForKey:inverseRelationName]) {
+            for (NSManagedObject *relationObject in [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]) {
                 [relationObject deleteEntityInContext:self.context];
             }
         }
         else{
             //Ponemos la relación a nil
-            NSManagedObject *relationObject = [managedObject valueForKey:inverseRelationName];
+            NSManagedObject *relationObject = [[managedObject objectInContext:self.context] valueForKey:inverseRelationName];
             [relationObject deleteEntityInContext:self.context];
         }
     }
@@ -1246,8 +1246,6 @@ typedef void (^DownloadCompletionBlock)();
                                                             i++;
                                                         }
                                                     }
-                                                    
-                                                    
                                                 }
                                                 else if ([[object objectForKey:key] isKindOfClass:[NSDictionary class]]){
                                                     if([key isEqualToString:className]){
