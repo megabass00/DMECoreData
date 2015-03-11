@@ -15,6 +15,7 @@
 @property (strong, nonatomic) NSURL *modelURL;
 @property (strong, nonatomic) NSURL *dbURL;
 @property (strong, nonatomic) NSMutableDictionary *threadsContexts;
+@property (nonatomic) __block BOOL *saving;
 
 @end
 
@@ -24,7 +25,8 @@ static DMECoreDataStack *sharedInstance = nil;
 
 #pragma mark - Singleton
 
-+(instancetype)sharedInstance {
++(instancetype)sharedInstance
+{
     if(sharedInstance){
         return sharedInstance;
     }
@@ -35,7 +37,8 @@ static DMECoreDataStack *sharedInstance = nil;
 
 #pragma mark - Init Methods
 
-+(instancetype) coreDataStackWithModelName:(NSString *)aModelName databaseFilename:(NSString*) aDBName{
++(instancetype)coreDataStackWithModelName:(NSString *)aModelName databaseFilename:(NSString*) aDBName
+{
     if(sharedInstance == nil){
         NSURL *url = nil;
         
@@ -60,15 +63,18 @@ static DMECoreDataStack *sharedInstance = nil;
     }
 }
 
-+(instancetype) coreDataStackWithModelName:(NSString *)aModelName{
++(instancetype)coreDataStackWithModelName:(NSString *)aModelName
+{
     return [DMECoreDataStack coreDataStackWithModelName:aModelName databaseFilename:nil];
 }
 
-+(instancetype) coreDataStackWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL{
++(instancetype)coreDataStackWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL
+{
     if(sharedInstance == nil){
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
-            sharedInstance = [[DMECoreDataStack alloc] initWithModelName: aModelName databaseURL:aDBURL];
+            sharedInstance = [[DMECoreDataStack alloc] initWithModelName:aModelName databaseURL:aDBURL];
+            sharedInstance.saving = NO;
         });
         
         return sharedInstance;
@@ -88,7 +94,6 @@ static DMECoreDataStack *sharedInstance = nil;
 @synthesize model=_model;
 @synthesize storeCoordinator=_storeCoordinator;
 @synthesize mainContext=_mainContext;
-@synthesize backgroundContext=_backgroundContext;
 //@synthesize privateContext=_privateContext;
 
 /*-(NSManagedObjectContext *)privateContext{
@@ -103,28 +108,34 @@ static DMECoreDataStack *sharedInstance = nil;
 }*/
 
 
--(NSManagedObjectContext *)mainContext{
+-(NSManagedObjectContext *)mainContext
+{
     //Creamos un solo contexto para el hilo actual
     if (_mainContext == nil){
         _mainContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         //_mainContext.parentContext = [self privateContext];
         _mainContext.persistentStoreCoordinator = self.storeCoordinator;
+        _mainContext.undoManager = nil;
         [_mainContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     }
     
     return _mainContext;
 }
 
--(NSManagedObjectContext *)backgroundContext{
+-(NSManagedObjectContext *)backgroundContext
+{
     //Creamos de nuevo el contexto background
-    _backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-    _backgroundContext.parentContext = [self mainContext];
-    [_backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
+    NSManagedObjectContext *backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    backgroundContext.parentContext = [self mainContext];
+    backgroundContext.undoManager = nil;
+    backgroundContext.retainsRegisteredObjects = NO;
+    [backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
     
-    return _backgroundContext;
+    return backgroundContext;
 }
 
--(NSPersistentStoreCoordinator *) storeCoordinator{
+-(NSPersistentStoreCoordinator *)storeCoordinator
+{
     if (_storeCoordinator == nil) {
         _storeCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
         
@@ -156,7 +167,8 @@ static DMECoreDataStack *sharedInstance = nil;
     return _storeCoordinator;
 }
 
--(NSManagedObjectModel *) model{
+-(NSManagedObjectModel *)model
+{
     
     if (_model == nil) {
         _model = [[NSManagedObjectModel alloc] initWithContentsOfURL:self.modelURL];
@@ -167,20 +179,21 @@ static DMECoreDataStack *sharedInstance = nil;
 
 #pragma mark - Class Methods
 
-+(NSString *) persistentStoreCoordinatorErrorNotificationName{
++(NSString *) persistentStoreCoordinatorErrorNotificationName
+{
     return @"persistentStoreCoordinatorErrorNotificationName";
 }
 
 // Returns the URL to the application's Documents directory.
-+ (NSURL *)applicationDocumentsDirectory
++(NSURL *)applicationDocumentsDirectory
 {
     return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
 }
 
 #pragma mark - Init
 
--(id) initWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL{
-    
+-(id)initWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL
+{
     if (self = [super init]) {
         self.modelURL = [[NSBundle mainBundle] URLForResource:aModelName
                                                 withExtension:@"momd"];
@@ -193,7 +206,8 @@ static DMECoreDataStack *sharedInstance = nil;
 
 #pragma mark - Others
 
--(void) zapAllData{
+-(void)zapAllData
+{
     NSError *err = nil;
     for (NSPersistentStore *store in self.storeCoordinator.persistentStores) {
         
@@ -213,56 +227,76 @@ static DMECoreDataStack *sharedInstance = nil;
     // Part of the problem is that the stack keeps a cache of the data that is in the file. When you
     // remove the file you don't have a way to clear that cache and you are then putting
     // Core Data into an unknown and unstable state.
-    _backgroundContext = nil;
     _mainContext = nil;
     //_privateContext = nil;
     _storeCoordinator = nil;
     //[self privateContext];
     [self mainContext]; // this will rebuild the stack
-    [self backgroundContext]; // this will rebuild the stack
 }
 
--(void) saveWithCompletionBlock:(void(^)(BOOL didSave, NSError *error))completionBlock
+-(void)saveWithCompletionBlock:(void(^)(BOOL didSave, NSError *error))completionBlock
 {
-    //Guardamos el contexto principal de la interfaz
-    __block NSError *err = nil;
-    __block BOOL success = NO;
-    [self.mainContext performBlockAndWait:^{
-        if (!_mainContext) {
-            err = [NSError errorWithDomain:@"com.damarte.coredata"
-                                      code:1
-                                  userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
-            completionBlock(success, err);
-        }
-        else if (self.mainContext.hasChanges) {
-            success = [self.mainContext save:&err];
-            completionBlock(success, err);
-            /*if (success && !err) {
-                //Guardamos el contexto que escribe en disco
-                [self.privateContext performBlockAndWait:^{
-                    if (!_privateContext) {
-                        err = [NSError errorWithDomain:@"com.damarte.coredata"
-                                                  code:1
-                                              userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no private context - probably there was an earlier error trying to access the CoreData database file."}];
-                        completionBlock(success, err);
-                    }
-                    else if (self.privateContext.hasChanges) {
-                        success = [self.privateContext save:&err];
-                        completionBlock(success, err);
-                    }
-                    else{
-                        completionBlock(NO, err);
-                    }
-                }];
+    if(!self.saving){
+        //Guardamos el contexto principal de la interfaz
+        [self.mainContext performBlockAndWait:^{
+            self.saving = YES;
+            NSError *err = nil;
+            BOOL success = NO;
+            
+            if (!_mainContext) {
+                err = [NSError errorWithDomain:@"com.damarte.coredata" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no context - probably there was an earlier error trying to access the CoreData database file."}];
+                
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completionBlock(success, err);
+                });
+                
+                self.saving = NO;
+            }
+            else if (self.mainContext.hasChanges) {
+                success = [self.mainContext save:&err];
+                
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completionBlock(success, err);
+                });
+                
+                self.saving = NO;
+                
+                /*if (success && !err) {
+                 //Guardamos el contexto que escribe en disco
+                 [self.privateContext performBlockAndWait:^{
+                 if (!_privateContext) {
+                 err = [NSError errorWithDomain:@"com.damarte.coredata"
+                 code:1
+                 userInfo:@{NSLocalizedDescriptionKey: @"Attempted to save a nil NSManagedObjectContext. This CoreDataStack has no private context - probably there was an earlier error trying to access the CoreData database file."}];
+                 completionBlock(success, err);
+                 }
+                 else if (self.privateContext.hasChanges) {
+                 success = [self.privateContext save:&err];
+                 completionBlock(success, err);
+                 }
+                 else{
+                 completionBlock(NO, err);
+                 }
+                 }];
+                 }
+                 else{
+                 completionBlock(NO, err);
+                 }*/
             }
             else{
-                completionBlock(NO, err);
-            }*/
-        }
-        else{
-            completionBlock(NO, err);
-        }
-    }];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completionBlock(NO, nil);
+                });
+                
+                self.saving = NO;
+            }
+        }];
+    }
+    else{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completionBlock(NO, nil);
+        });
+    }
 }
 
 @end

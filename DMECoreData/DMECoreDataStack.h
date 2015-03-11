@@ -12,9 +12,10 @@
 @interface DMECoreDataStack : NSObject
 
 @property (strong, nonatomic, readonly) NSManagedObjectContext *mainContext;
-@property (strong, nonatomic, readonly) NSManagedObjectContext *backgroundContext;
 
 +(instancetype)sharedInstance;
+
+-(NSManagedObjectContext *)backgroundContext;
 
 +(NSString *) persistentStoreCoordinatorErrorNotificationName;
 

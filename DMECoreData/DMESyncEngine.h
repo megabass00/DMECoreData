@@ -52,6 +52,7 @@ typedef void (^MessageBlock)(NSString *message, BOOL important);
 @interface DMESyncEngine : NSObject
 
 @property (atomic, readonly) BOOL syncInProgress;   //Indica si la sincronización esta ya en curso
+@property (atomic) BOOL syncBlocked;   //Indica si la sincronización esta bloqueada
 @property (assign, nonatomic) NSInteger autoSyncDelay;
 @property (assign, nonatomic) BOOL downloadFiles;
 @property (assign, nonatomic) BOOL downloadOptionalFiles;
