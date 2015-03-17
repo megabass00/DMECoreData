@@ -116,7 +116,7 @@ static DMECoreDataStack *sharedInstance = nil;
         //_mainContext.parentContext = [self privateContext];
         _mainContext.persistentStoreCoordinator = self.storeCoordinator;
         _mainContext.undoManager = nil;
-        [_mainContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
+        [_mainContext setMergePolicy:NSRollbackMergePolicy];
     }
     
     return _mainContext;
@@ -129,7 +129,7 @@ static DMECoreDataStack *sharedInstance = nil;
     backgroundContext.parentContext = [self mainContext];
     backgroundContext.undoManager = nil;
     backgroundContext.retainsRegisteredObjects = NO;
-    [backgroundContext setMergePolicy:NSMergeByPropertyObjectTrumpMergePolicy];
+    [backgroundContext setMergePolicy:NSRollbackMergePolicy];
     
     return backgroundContext;
 }

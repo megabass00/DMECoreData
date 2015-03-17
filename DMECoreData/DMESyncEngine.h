@@ -53,6 +53,7 @@ typedef void (^MessageBlock)(NSString *message, BOOL important);
 
 @property (atomic, readonly) BOOL syncInProgress;   //Indica si la sincronización esta ya en curso
 @property (atomic) BOOL syncBlocked;   //Indica si la sincronización esta bloqueada
+@property (atomic) BOOL autoSyncActive; //Indica si la sincronización automática está activada
 @property (assign, nonatomic) NSInteger autoSyncDelay;
 @property (assign, nonatomic) BOOL downloadFiles;
 @property (assign, nonatomic) BOOL downloadOptionalFiles;
@@ -87,6 +88,7 @@ typedef void (^MessageBlock)(NSString *message, BOOL important);
 //Indica si ya se ha sincronizado inicialmente
 - (BOOL)initialSyncComplete;
 - (void)setInitialSyncIncompleted;
+- (void)cancelAutoSync;
 - (void)blockSync;
 - (void)unblockSync;
 - (void)clearCache;

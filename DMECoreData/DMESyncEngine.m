@@ -24,7 +24,6 @@ typedef void (^DownloadCompletionBlock)();
     DownloadCompletionBlock downloadCompletionAuxBlock;
     NSMutableDictionary *savedEntities;
     NSTimer *autoSyncTimer;
-
 }
 
 @property (nonatomic, strong) NSManagedObjectContext *context;
@@ -50,6 +49,12 @@ typedef void (^DownloadCompletionBlock)();
 @property (nonatomic, strong) ProgressBlock progressBlock;
 @property (nonatomic, strong) MessageBlock messageBlock;
 
+@property (nonatomic, strong) SyncStartBlock autoSyncStartBlock;
+@property (nonatomic, strong) SyncCompletionBlock autoSyncCompletionBlock;
+@property (nonatomic, strong) ErrorBlock autoSyncErrorBlock;
+@property (nonatomic, strong) ProgressBlock autoSyncProgressBlock;
+@property (nonatomic, strong) MessageBlock autoSyncMessageBlock;
+
 @property (nonatomic, strong) NSDate *startDate;
 
 @end
@@ -66,6 +71,7 @@ typedef void (^DownloadCompletionBlock)();
         sharedEngine.autoSyncDelay = 180;
         sharedEngine.logLevel = SyncLogLevelVerbose;
         sharedEngine.syncBlocked = NO;
+        sharedEngine.autoSyncActive = NO;
     });
     
     return sharedEngine;
@@ -131,17 +137,30 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Indica si ya se ha sincronizado la primera vez
-- (BOOL)initialSyncComplete {
+-(BOOL)initialSyncComplete {
     return [[NSUserDefaults standardUserDefaults] boolForKey:SyncEngineInitialCompleteKey];
 }
 
-- (void)blockSync
+-(void)cancelAutoSync
+{
+    if(self.autoSyncActive){
+        if(autoSyncTimer){
+            [autoSyncTimer invalidate];
+            autoSyncTimer = nil;
+        }
+        
+        self.autoSyncActive = NO;
+    }
+}
+
+-(void)blockSync
 {
     if(!_syncBlocked){
         if(autoSyncTimer){
             [autoSyncTimer invalidate];
             autoSyncTimer = nil;
         }
+        self.syncBlocked = YES;
         
         [self willChangeValueForKey:@"syncBlocked"];
         _syncBlocked = YES;
@@ -149,7 +168,7 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-- (void)unblockSync
+-(void)unblockSync
 {
     if(_syncBlocked){
         autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
@@ -275,14 +294,21 @@ typedef void (^DownloadCompletionBlock)();
 //Repite la sincronizacion periodicamente
 - (void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
-    [self startSync:startBlock withCompletionBlock:completionBlock withProgressBlock:progressBlock withMessageBlock:messageBlock withErrorBlock:errorBlock];
-    
-    autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+    if(!autoSyncTimer && !self.syncBlocked && self.autoSyncDelay > 0){
+        self.autoSyncCompletionBlock = completionBlock;
+        self.autoSyncStartBlock = startBlock;
+        self.autoSyncMessageBlock = messageBlock;
+        self.autoSyncProgressBlock = progressBlock;
+        self.autoSyncErrorBlock = errorBlock;
+        self.autoSyncActive = YES;
+        
+        [self startSync:self.autoSyncStartBlock withCompletionBlock:self.autoSyncCompletionBlock withProgressBlock:self.autoSyncProgressBlock withMessageBlock:self.autoSyncMessageBlock withErrorBlock:self.autoSyncErrorBlock];
+    }
 }
 
 - (void)autoSyncRepeat:(NSTimer *)timer
 {
-    [self startSync:self.startBlock withCompletionBlock:self.completionBlock withProgressBlock:self.progressBlock withMessageBlock:self.messageBlock withErrorBlock:self.errorBlock];
+    [self startSync:self.autoSyncStartBlock withCompletionBlock:self.autoSyncCompletionBlock withProgressBlock:self.autoSyncProgressBlock withMessageBlock:self.autoSyncMessageBlock withErrorBlock:self.autoSyncErrorBlock];
 }
 
 //Enviar datos
@@ -361,7 +387,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - Start/End Sync Operations
 
 //Comienzo de la sincronizacion
--(void)executeSyncStartOperations:(void (^)())completionBlock {
+-(void)executeSyncStartOperations:(void (^)())completionBlock
+{
     @autoreleasepool {
         if(self.initialSyncComplete){
             [[NSThread currentThread] setName:@"Sync"];
@@ -387,6 +414,11 @@ typedef void (^DownloadCompletionBlock)();
         _syncInProgress = YES;
         [self didChangeValueForKey:@"syncInProgress"];
         
+        if(autoSyncTimer){
+            [autoSyncTimer invalidate];
+            autoSyncTimer = nil;
+        }
+        
         [[DMECoreDataStack sharedInstance] saveWithCompletionBlock:^(BOOL didSave, NSError *error) {
             if(!error){
                 if(self.startBlock){
@@ -400,16 +432,30 @@ typedef void (^DownloadCompletionBlock)();
                 }];
             }
             else{
-                [self logError:@"Error when save main context: %@",error];
+                NSError *error = [self createErrorWithCode:SyncErrorCodeSaveContext
+                                            andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
+                                          andFailureReason:NSLocalizedString(@"Ha fallado al guardar el contexto", nil)
+                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
+                
+                [self errorBlock:error fatal:YES];
+                [self executeSyncErrorOperations];
+                error = nil;
             }
         }];
     }
 }
 
 //Final de la sincronizacion
-- (void)executeSyncCompletedOperations {
+- (void)executeSyncCompletedOperations
+{
     @autoreleasepool {
         [self cleanEngine];
+        
+        if(self.autoSyncActive){
+            dispatch_async(dispatch_get_main_queue(), ^{
+                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+            });
+        }
         
         [self messageBlock:NSLocalizedString(@"Proceso terminado", nil) important:YES];
         
@@ -429,9 +475,16 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Error en la sincronizacion
-- (void)executeSyncErrorOperations {
+- (void)executeSyncErrorOperations
+{
     @autoreleasepool {
         [self cleanEngine];
+        
+        if(self.autoSyncActive){
+            dispatch_async(dispatch_get_main_queue(), ^{
+                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+            });
+        }
         
         [self messageBlock:NSLocalizedString(@"Terminando proceso tras un error...", nil) important:YES];
         
@@ -447,7 +500,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - Core Data
 
 //Crea un objeto Core Data a partir de un registro JSON
-- (NSManagedObject *)newManagedObjectWithClassName:(NSString *)className forRecord:(NSDictionary *)record {
+- (NSManagedObject *)newManagedObjectWithClassName:(NSString *)className forRecord:(NSDictionary *)record
+{
     @autoreleasepool {
         //Creamos el nuevo objeto
         NSManagedObject *newManagedObject = [NSEntityDescription insertNewObjectForEntityForName:className inManagedObjectContext:self.context];
@@ -507,6 +561,7 @@ typedef void (^DownloadCompletionBlock)();
                             [self setValue:[[record objectForKey:className] objectForKey:key] forKey:key forManagedObject:[managedObject objectInContext:self.context]];
                         }
                     }
+                    [managedObject setValue:[NSNumber numberWithInt:ObjectSynced] forKey:@"syncStatus"];
                 }
                 else if([[record objectForKey:key] isKindOfClass:[NSDictionary class]]){ //Si es otro objeto comprobamos actualizamos la relacion
                     //Creamos la relacion con el objeto principal
@@ -876,17 +931,12 @@ typedef void (^DownloadCompletionBlock)();
                                                 andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
                                               andFailureReason:NSLocalizedString(@"Ha fallado al guardar el contexto", nil)
                                          andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
-                    if(self.initialSyncComplete){
-                        [self errorBlock:error fatal:NO];
-                    }
-                    else{
-                        [self errorBlock:error fatal:YES];
-                        [self executeSyncErrorOperations];
-                        return;
-                    }
-                    
+
+                    [self errorBlock:error fatal:YES];
+                    [self executeSyncErrorOperations];
                     error = nil;
-                    result = NO;
+                    
+                    return;
                 }
             }
             
@@ -897,7 +947,12 @@ typedef void (^DownloadCompletionBlock)();
                     }
                     else{
                         [self logError:@"Error when save main context: %@", error];
-                        success(NO);
+                        
+                        [self errorBlock:error fatal:YES];
+                        [self executeSyncErrorOperations];
+                        error = nil;
+                        
+                        return;
                     }
                 }];
             }
@@ -1435,7 +1490,6 @@ typedef void (^DownloadCompletionBlock)();
                                                     for (NSString* key in object) {
                                                         @autoreleasepool {
                                                             if([[object objectForKey:key] isKindOfClass:[NSArray class]]){
-                                                                
                                                                 //Obtenemos el nombre de la relacion
                                                                 NSString *relationName = [[self nameFromClassName:className relation:key] objectForKey:@"relationName"];
                                                                 
@@ -1483,14 +1537,12 @@ typedef void (^DownloadCompletionBlock)();
                                                     }];
                                                 }
                                                 else{
-                                                    NSError *errorPost = [self createErrorWithCode:SyncErrorCodeCreateInfo
-                                                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido enviar el %@ al servidor", nil), [self logClassName:className]]
-                                                                                  andFailureReason:NSLocalizedString(@"Ha fallado la respuesta del servicio web", nil)
-                                                                             andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                                                    [self errorBlock:errorPost fatal:NO];
-                                                    errorPost = nil;
+                                                    //Delete object in Core Data
+                                                    [self.context deleteObject:[objectToCreate objectInContext:self.context]];
                                                     
-                                                    dispatch_group_leave(groupGeneral);
+                                                    [self saveContext:^(BOOL result) {
+                                                        dispatch_group_leave(groupGeneral);
+                                                    }];
                                                 }
                                             }
                                             else{
@@ -2244,7 +2296,7 @@ typedef void (^DownloadCompletionBlock)();
     else{
         self.progressSubprocessCurrent += 1;
         
-        current = self.progressCurrent+(((1/self.progressTotal)/self.progressSubprocessTotal)*self.progressSubprocessCurrent);
+        current = self.progressCurrent+(self.progressSubprocessCurrent/self.progressSubprocessTotal);
     }
     
     if(self.progressBlock){
