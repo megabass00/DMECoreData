@@ -59,38 +59,38 @@ typedef void (^MessageBlock)(NSString *message, BOOL important);
 @property (assign, nonatomic) BOOL downloadOptionalFiles;
 @property (assign, nonatomic) SyncLogLevel logLevel;
 
-+ (instancetype)sharedEngine;
++(instancetype)sharedEngine;
 
 #pragma mark - Start Methods
 
 //Sincronizacion puntual
-- (void)startSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
+-(void)startSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
 
 //Sincronizacion periodica
-- (void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
+-(void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
 
 //Enviar datos
-- (void)pushDataToServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
+-(void)pushDataToServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
 
 //Recibir datos
-- (void)fetchDataFromServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
+-(void)fetchDataFromServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
 
 //Download files
-- (void)downloadFiles:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
+-(void)downloadFiles:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock;
 
 #pragma mark - Other
 
 //Registra una clase para ser sincronizada con el servidor
-- (void)registerNSManagedObjectClassToSync:(Class)aClass;
-- (void)registerNSManagedObjectClassToSyncWithFiles:(Class)aClass;
-- (void)registerNSManagedObjectClassToSyncWithOptionalFiles:(Class)aClass;
+-(void)registerNSManagedObjectClassToSync:(Class)aClass;
+-(void)registerNSManagedObjectClassToSyncWithFiles:(Class)aClass;
+-(void)registerNSManagedObjectClassToSyncWithOptionalFiles:(Class)aClass;
 
 //Indica si ya se ha sincronizado inicialmente
-- (BOOL)initialSyncComplete;
-- (void)setInitialSyncIncompleted;
-- (void)cancelAutoSync;
-- (void)blockSync;
-- (void)unblockSync;
-- (void)clearCache;
+-(BOOL)initialSyncComplete;
+-(void)setInitialSyncIncompleted;
+-(void)cancelAutoSync;
+-(void)blockSync;
+-(void)unblockSync;
+-(void)clearCache;
 
 @end

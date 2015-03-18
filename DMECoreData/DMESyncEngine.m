@@ -17,7 +17,7 @@ typedef void (^RecieveObjectsCompletionBlock)();
 typedef void (^SendObjectsCompletionBlock)();
 typedef void (^DownloadCompletionBlock)();
 
-@interface DMESyncEngine (){
+@interface DMESyncEngine(){
     NSPredicate *idPredicateTemplate;
     NSPredicate *syncStatusPredicateTemplate;
     NSPredicate *syncStatusNotPredicateTemplate;
@@ -61,7 +61,8 @@ typedef void (^DownloadCompletionBlock)();
 
 @implementation DMESyncEngine
 
-+ (instancetype)sharedEngine {
++(instancetype)sharedEngine
+{
     static DMESyncEngine *sharedEngine = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -80,7 +81,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - General
 
 //Anade una clase al array para ser sincronizada
-- (void)registerNSManagedObjectClassToSync:(Class)aClass {
+-(void)registerNSManagedObjectClassToSync:(Class)aClass
+{
     if (!self.registeredClassesToSync) {
         self.registeredClassesToSync = [NSMutableArray array];
     }
@@ -97,7 +99,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Anade una clase al array para ser sincronizada y descargar su multimedia
-- (void)registerNSManagedObjectClassToSyncWithFiles:(Class)aClass {
+-(void)registerNSManagedObjectClassToSyncWithFiles:(Class)aClass
+{
     
     if (!self.registeredClassesWithFiles) {
         self.registeredClassesWithFiles = [NSMutableArray array];
@@ -117,8 +120,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Anade una clase al array para ser sincronizada y descargar su multimedia opcional
-- (void)registerNSManagedObjectClassToSyncWithOptionalFiles:(Class)aClass {
-    
+-(void)registerNSManagedObjectClassToSyncWithOptionalFiles:(Class)aClass
+{
     if (!self.registeredClassesWithOptionalFiles) {
         self.registeredClassesWithOptionalFiles = [NSMutableArray array];
     }
@@ -137,7 +140,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Indica si ya se ha sincronizado la primera vez
--(BOOL)initialSyncComplete {
+-(BOOL)initialSyncComplete
+{
     return [[NSUserDefaults standardUserDefaults] boolForKey:SyncEngineInitialCompleteKey];
 }
 
@@ -180,17 +184,17 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Guarda la primera sincronizacion
-- (void)setInitialSyncCompleted {
+-(void)setInitialSyncCompleted {
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:SyncEngineInitialCompleteKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (void)setInitialSyncIncompleted {
+-(void)setInitialSyncIncompleted {
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:SyncEngineInitialCompleteKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (NSError *)createErrorWithCode:(SyncErrorCode)aCode andDescription:(NSString *)aDescription andFailureReason:(NSString *)aReason andRecoverySuggestion:(NSString *)aSuggestion
+-(NSError *)createErrorWithCode:(SyncErrorCode)aCode andDescription:(NSString *)aDescription andFailureReason:(NSString *)aReason andRecoverySuggestion:(NSString *)aSuggestion
 {
     NSDictionary *userInfo = @{NSLocalizedDescriptionKey: aDescription,
                                NSLocalizedFailureReasonErrorKey: aReason,
@@ -198,7 +202,7 @@ typedef void (^DownloadCompletionBlock)();
     return [NSError errorWithDomain:SyncEngineErrorDomain code:aCode userInfo:userInfo];
 }
 
-- (void)checkStartConditionsNeedInstall:(BOOL)needInstall completionBlock:(void (^)())completionBlock
+-(void)checkStartConditionsNeedInstall:(BOOL)needInstall completionBlock:(void (^)())completionBlock
 {
     self.context = [DMECoreDataStack sharedInstance].backgroundContext;
     
@@ -239,7 +243,7 @@ typedef void (^DownloadCompletionBlock)();
 
 //Comienza la sincronizacion
 
-- (void)startSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
+-(void)startSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
     @autoreleasepool {
         //Inicializamos la sincronizacion
@@ -292,7 +296,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Repite la sincronizacion periodicamente
-- (void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
+-(void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
     if(!autoSyncTimer && !self.syncBlocked && self.autoSyncDelay > 0){
         self.autoSyncCompletionBlock = completionBlock;
@@ -306,7 +310,7 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-- (void)autoSyncRepeat:(NSTimer *)timer
+-(void)autoSyncRepeat:(NSTimer *)timer
 {
     [self startSync:self.autoSyncStartBlock withCompletionBlock:self.autoSyncCompletionBlock withProgressBlock:self.autoSyncProgressBlock withMessageBlock:self.autoSyncMessageBlock withErrorBlock:self.autoSyncErrorBlock];
 }
@@ -419,8 +423,8 @@ typedef void (^DownloadCompletionBlock)();
             autoSyncTimer = nil;
         }
         
-        [[DMECoreDataStack sharedInstance] saveWithCompletionBlock:^(BOOL didSave, NSError *error) {
-            if(!error){
+        [self saveContext:^(BOOL result) {
+            if(result){
                 if(self.startBlock){
                     dispatch_async(dispatch_get_main_queue(), ^{
                         self.startBlock();
@@ -431,22 +435,12 @@ typedef void (^DownloadCompletionBlock)();
                     completionBlock();
                 }];
             }
-            else{
-                NSError *error = [self createErrorWithCode:SyncErrorCodeSaveContext
-                                            andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
-                                          andFailureReason:NSLocalizedString(@"Ha fallado al guardar el contexto", nil)
-                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
-                
-                [self errorBlock:error fatal:YES];
-                [self executeSyncErrorOperations];
-                error = nil;
-            }
         }];
     }
 }
 
 //Final de la sincronizacion
-- (void)executeSyncCompletedOperations
+-(void)executeSyncCompletedOperations
 {
     @autoreleasepool {
         [self cleanEngine];
@@ -475,7 +469,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Error en la sincronizacion
-- (void)executeSyncErrorOperations
+-(void)executeSyncErrorOperations
 {
     @autoreleasepool {
         [self cleanEngine];
@@ -500,7 +494,7 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - Core Data
 
 //Crea un objeto Core Data a partir de un registro JSON
-- (NSManagedObject *)newManagedObjectWithClassName:(NSString *)className forRecord:(NSDictionary *)record
+-(NSManagedObject *)newManagedObjectWithClassName:(NSString *)className forRecord:(NSDictionary *)record
 {
     @autoreleasepool {
         //Creamos el nuevo objeto
@@ -549,7 +543,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Actualiza un objeto Core Data a partir de un registro JSON
-- (NSManagedObject *)updateManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record {
+-(NSManagedObject *)updateManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record
+{
     @autoreleasepool {
         //Recorremos las relaciones
         for (NSString* key in record) {
@@ -591,7 +586,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Vacia una relacion
--(void)truncateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className {
+-(void)truncateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className
+{
     @autoreleasepool {
         //Obtenemos el nombre de la relacion
         NSDictionary *values = [self nameFromClassName:className relation:relation];
@@ -638,7 +634,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Actualiza las relaciones de un objeto Core Data a partir del JSON
-- (NSManagedObject *)updateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record {
+-(NSManagedObject *)updateRelation:(NSString *)relation ofManagedObject:(NSManagedObject *)managedObject withClassName:(NSString *)className withRecord:(NSDictionary *)record
+{
     @autoreleasepool {
         NSManagedObject *newRelationManagedObject = nil;
         
@@ -725,7 +722,8 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
--(NSDictionary *)nameFromClassName:(NSString *)className relation:(NSString *)relation{
+-(NSDictionary *)nameFromClassName:(NSString *)className relation:(NSString *)relation
+{
     //Obtenemos el nombre de la relacion
     @autoreleasepool {
         NSString *relationName;
@@ -747,7 +745,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Introduce un valor en una propiedad de un objeto Core Data
-- (void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject {
+-(void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject
+{
     @autoreleasepool {
         //Si el objeto tiene esa propiedad
         if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isDeleted]){
@@ -776,21 +775,24 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-- (NSPredicate *)idPredicateTemplate {
+-(NSPredicate *)idPredicateTemplate
+{
     if (idPredicateTemplate == nil) {
         idPredicateTemplate = [NSPredicate predicateWithFormat:@"id = $ID"];
     }
     return idPredicateTemplate;
 }
 
-- (NSPredicate *)syncStatusPredicateTemplate {
+-(NSPredicate *)syncStatusPredicateTemplate
+{
     if (syncStatusPredicateTemplate == nil) {
         syncStatusPredicateTemplate = [NSPredicate predicateWithFormat:@"syncStatus = $SYNC_STATUS"];
     }
     return syncStatusPredicateTemplate;
 }
 
-- (NSPredicate *)syncStatusNotPredicateTemplate {
+-(NSPredicate *)syncStatusNotPredicateTemplate
+{
     if (syncStatusNotPredicateTemplate == nil) {
         syncStatusNotPredicateTemplate = [NSPredicate predicateWithFormat:@"syncStatus != $SYNC_STATUS"];
     }
@@ -798,13 +800,14 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Obtiene todos los objetos Core Data que tengan un estado de sincronizacion determinado
-- (NSArray *)managedObjectsForClass:(NSString *)className withSyncStatus:(ObjectSyncStatus)syncStatus {
+-(NSArray *)managedObjectsForClass:(NSString *)className withSyncStatus:(ObjectSyncStatus)syncStatus
+{
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
         [fetchRequest setPredicate:[[self syncStatusPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:syncStatus]}]];
         
-        __block NSArray *results = nil;
+        __block NSArray *results = @[];
         [self.context performBlockAndWait:^{
             NSError *error = nil;
             results = [self.context executeFetchRequest:fetchRequest error:&error];
@@ -817,7 +820,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Obtiene todos los objetos Core Data que NO tengan un estado de sincronizacion determinado
-- (NSArray *)managedObjectsForClass:(NSString *)className withPredicate:(NSPredicate *)predicate {
+-(NSArray *)managedObjectsForClass:(NSString *)className withPredicate:(NSPredicate *)predicate
+{
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
@@ -825,7 +829,7 @@ typedef void (^DownloadCompletionBlock)();
             [fetchRequest setPredicate:predicate];
         }
         
-        __block NSArray *objects = nil;
+        __block NSArray *objects = @[];
         [self.context performBlockAndWait:^{
             NSError *error = nil;
             objects = [self.context executeFetchRequest:fetchRequest error:&error];
@@ -837,12 +841,14 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-- (NSArray *)managedObjectsForClass:(NSString *)className {
+-(NSArray *)managedObjectsForClass:(NSString *)className
+{
     return [self managedObjectsForClass:className withPredicate:nil];
 }
 
 //Comprueba si existe un objeto
-- (BOOL)existsManagedObjectForClass:(NSString *)className withId:(NSString *)aId {
+-(BOOL)existsManagedObjectForClass:(NSString *)className withId:(NSString *)aId
+{
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         [fetchRequest setFetchLimit:1];
@@ -862,7 +868,8 @@ typedef void (^DownloadCompletionBlock)();
 
 
 //Obtiene el objeto Core Data con un id
-- (NSManagedObject *)managedObjectForClass:(NSString *)className withId:(NSString *)aId {
+-(NSManagedObject *)managedObjectForClass:(NSString *)className withId:(NSString *)aId
+{
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         [fetchRequest setFetchLimit:1];
@@ -881,7 +888,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Obtiene los objetos Core Data de un tipo que esten en el array de ids
-- (NSArray *)managedObjectsForClass:(NSString *)className sortedByKey:(NSString *)key usingArrayOfIds:(NSArray *)idArray inArrayOfIds:(BOOL)inIds {
+-(NSArray *)managedObjectsForClass:(NSString *)className sortedByKey:(NSString *)key usingArrayOfIds:(NSArray *)idArray inArrayOfIds:(BOOL)inIds
+{
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         NSPredicate *predicate;
@@ -897,7 +905,7 @@ typedef void (^DownloadCompletionBlock)();
         [fetchRequest setPredicate:andPredicate];
         [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
         
-        __block NSArray *results = nil;
+        __block NSArray *results = @[];
         [self.context performBlockAndWait:^{
             NSError *error = nil;
             results = [self.context executeFetchRequest:fetchRequest error:&error];
@@ -912,7 +920,7 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-- (void)saveContext:(void (^)(BOOL result))success
+-(void)saveContext:(void (^)(BOOL result))success
 {
     [self.context performBlockAndWait:^{
         @autoreleasepool {
@@ -922,19 +930,21 @@ typedef void (^DownloadCompletionBlock)();
                 // Execute the sync completion operations as this is now the final step of the sync process
                 NSError *error = nil;
                 
-                if (![self.context save:&error]){
+                result = [self.context save:&error];
+                
+                if (!result){
                     NSLog(@"Unresolved error %@", error);
                     //NSLog(@"Unresolved error %@", [error userInfo]);
                     //NSLog(@"Unresolved error %@", [error localizedDescription]);
                     
-                    NSError *error = [self createErrorWithCode:SyncErrorCodeSaveContext
+                    NSError *errorFinal = [self createErrorWithCode:SyncErrorCodeSaveContext
                                                 andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
-                                              andFailureReason:NSLocalizedString(@"Ha fallado al guardar el contexto", nil)
+                                              andFailureReason:[error description]
                                          andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
 
-                    [self errorBlock:error fatal:YES];
+                    [self errorBlock:errorFinal fatal:YES];
                     [self executeSyncErrorOperations];
-                    error = nil;
+                    errorFinal = nil;
                     
                     return;
                 }
@@ -956,9 +966,6 @@ typedef void (^DownloadCompletionBlock)();
                     }
                 }];
             }
-            else{
-                success(NO);
-            }
         }
     }];
 }
@@ -966,12 +973,14 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - JSON Data Management
 
 //Devuelve los valores descargados para una clase
-- (NSArray *)JSONArrayForClassWithName:(NSString *)className{
+-(NSArray *)JSONArrayForClassWithName:(NSString *)className
+{
     return [self JSONArrayForClassWithName:className modifiedAfter:nil];
 }
 
 //Devuelve los valores descargados para una clase modificados a partir de una fecha o que no esten en la base de datos
-- (NSArray *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate {
+-(NSArray *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate
+{
     @autoreleasepool {
         if(aDate){
             //TODO: Optimizar a fuego
@@ -985,12 +994,14 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Devuelve los valores descargados para una clase ordenados por un campo
-- (NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key {
+-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key
+{
     return [self JSONDataRecordsForClass:className sortedByKey:key modifiedAfter:nil];
 }
 
 //Devuelve los valores descargados para una clase ordenados por un campo y modificados a partir de una fecha
-- (NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate {
+-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate
+{
     NSArray *JSONArray = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
     NSArray *result = [JSONArray sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
         @autoreleasepool {
@@ -1022,7 +1033,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark Receive Data
 
 //Descarga los datos de sincronizacion
--(void)downloadSyncEntitiesForSync:(RecieveObjectsCompletionBlock)completionBlock {
+-(void)downloadSyncEntitiesForSync:(RecieveObjectsCompletionBlock)completionBlock
+{
     [self.context performBlock:^{
         @autoreleasepool {
             [self messageBlock:NSLocalizedString(@"Descargando información de sincronización...", nil) important:YES];
@@ -1041,21 +1053,31 @@ typedef void (^DownloadCompletionBlock)();
                     if(!error){
                         self.classesToSync = [NSMutableArray array];
                         
-                        for (NSString *className in self.registeredClassesToSync) {
+                        for (NSDictionary *entity in objects) {
                             @autoreleasepool {
-                                if([objects containsObject:className]){
+                                NSString *className = [entity valueForKey:@"entity"];
+                                BOOL delete = [[entity valueForKey:@"delete"] boolValue];
+                                
+                                //Añadimos la entidad para sincronizar
+                                if([self.registeredClassesToSync containsObject:className]){
                                     [self.classesToSync addObject:className];
                                 }
+                                
+                                //Si esta marcada para borrar, truncamos todas las sincronizadas
+                                if(delete){
+                                    for (NSManagedObject *object in [self managedObjectsForClass:className withSyncStatus:ObjectSynced]) {
+                                        @autoreleasepool {
+                                            [object deleteEntityInContext:self.context];
+                                        }
+                                    }
+                                }
+                                
                             }
                         }
                         
                         [self messageBlock:NSLocalizedString(@"Información de sincronización descargada", nil) important:YES];
                         
-                        [self saveContext:^(BOOL result) {
-                            if(result){
-                                [self downloadJSONForRegisteredObjects:completionBlock];
-                            }
-                        }];
+                        [self downloadJSONForRegisteredObjects:completionBlock];
                     }
                     else{
                         NSError *errorSync = nil;
@@ -1106,7 +1128,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Descarga los datos de las clases registradas
-- (void)downloadJSONForRegisteredObjects:(RecieveObjectsCompletionBlock)completionBlock {
+-(void)downloadJSONForRegisteredObjects:(RecieveObjectsCompletionBlock)completionBlock
+{
     [self.context performBlock:^{
         @autoreleasepool {
             savedEntities = [NSMutableDictionary dictionary];
@@ -1205,7 +1228,8 @@ typedef void (^DownloadCompletionBlock)();
     }];
 }
 
-- (void)processJSONDataRecordsIntoCoreData:(RecieveObjectsCompletionBlock)completionBlock {
+-(void)processJSONDataRecordsIntoCoreData:(RecieveObjectsCompletionBlock)completionBlock
+{
     NSMutableDictionary *JSONData = [NSMutableDictionary dictionary];
     
     // Calculamos el progreso
@@ -1269,7 +1293,7 @@ typedef void (^DownloadCompletionBlock)();
                         
                         if(id && ![id isEqualToString:@""]){
                             if([id isEqualToString:[storedManagedObject valueForKey:@"id"]]){
-                                if([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending){
+                                if(([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending) || [storedManagedObject valueForKey:@"modified"] == nil){
                                     [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
                                 }
                                 
@@ -1335,7 +1359,8 @@ typedef void (^DownloadCompletionBlock)();
     [self processJSONDataRecordsForDeletion:completionBlock];
 }
 
-- (void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock {
+-(void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock
+{
     // Iterate over all registered classes to sync
     if(self.initialSyncComplete){
         [self progressBlockTotal:self.classesToSync.count inMainProcess:NO];
@@ -1432,7 +1457,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark Send Data
 
 //Envia los objetos creados localmente al servidor
-- (void)postLocalObjectsToServer:(SendObjectsCompletionBlock)completionBlock {
+-(void)postLocalObjectsToServer:(SendObjectsCompletionBlock)completionBlock
+{
     [self.context performBlock:^{
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Enviando datos al servidor...", nil) important:YES];
@@ -1452,7 +1478,8 @@ typedef void (^DownloadCompletionBlock)();
     }];
 }
 
-- (void)postLocalObjectsToServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock {
+-(void)postLocalObjectsToServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock
+{
     @autoreleasepool {
         if(index >= self.registeredClassesToSync.count){
             if(completionBlock){
@@ -1590,7 +1617,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Envia los objetos actualizados localmente al servidor
-- (void)updateLocalObjectsToServer:(SendObjectsCompletionBlock)completionBlock {
+-(void)updateLocalObjectsToServer:(SendObjectsCompletionBlock)completionBlock
+{
     [self.context performBlock:^{
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Modificando datos en el servidor...", nil) important:YES];
@@ -1611,7 +1639,8 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 
-- (void)updateLocalObjectsToServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock {
+-(void)updateLocalObjectsToServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock
+{
     @autoreleasepool {
         if(index >= self.registeredClassesToSync.count){
             if(completionBlock){
@@ -1739,7 +1768,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Elimina del servidor los objetos eliminados localmente
-- (void)deleteObjectsOnServer:(SendObjectsCompletionBlock)completionBlock {
+-(void)deleteObjectsOnServer:(SendObjectsCompletionBlock)completionBlock {
     [self.context performBlock:^{
         if(self.initialSyncComplete){
             [self messageBlock:NSLocalizedString(@"Eliminando datos en el servidor...", nil) important:YES];
@@ -1763,7 +1792,7 @@ typedef void (^DownloadCompletionBlock)();
     }];
 }
 
-- (void)deleteObjectsOnServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock {
+-(void)deleteObjectsOnServerOfClassWithId:(NSInteger)index completionBlock:(void (^)())completionBlock {
     @autoreleasepool {
         if(index >= self.registeredClassesToSync.count){
             if(completionBlock){
@@ -1865,7 +1894,7 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark Download files
 
 //Comienza la descarga de ficheros
-- (void)downloadFiles:(DownloadCompletionBlock)completionBlock
+-(void)downloadFiles:(DownloadCompletionBlock)completionBlock
 {
     [self.context performBlockAndWait:^{
         //Comprobamos que hay que hacer
@@ -1928,7 +1957,7 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - Downloaded File Management
 
 //Comprueba si faltan ficheros por descargar y los añade a la lista
-- (void)checkFilesToDownload
+-(void)checkFilesToDownload
 {
     NSManagedObjectContext *managedObjectContext = self.context;
     
@@ -1959,7 +1988,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Descarga todos los ficheros de la cola
-- (void)downloadFilesToDownload:(DownloadCompletionBlock)completionBlock
+-(void)downloadFilesToDownload:(DownloadCompletionBlock)completionBlock
 {
     self.downloadQueue = [[NSOperationQueue alloc] init];
     self.downloadQueue.name = @"Download Files Queue";
@@ -1985,8 +2014,8 @@ typedef void (^DownloadCompletionBlock)();
             [self.downloadQueue addOperationWithBlock: ^ {
                 BOOL downloaded = YES;
                 if(![self fileExistWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]]){
-                    downloaded = [self downloadFileWithName:[file objectForKey:@"url"] ofClass: [file objectForKey:@"classname"]];
-                    [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass: [file objectForKey:@"classname"]];
+                    downloaded = [self downloadFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
+                    [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
                 }
                 
                 //Descargamos el fichero
@@ -1995,7 +2024,7 @@ typedef void (^DownloadCompletionBlock)();
                 [self progressBlockIncrementInMainProcess:NO];
                 
                 if(downloaded){
-                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"url"]] important:NO];
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
                 }
                 else{
                     
@@ -2008,7 +2037,7 @@ typedef void (^DownloadCompletionBlock)();
     [self.downloadQueue addObserver:self forKeyPath:@"operations" options:0 context:NULL];
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+-(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
 {
     if (object == self.downloadQueue && [keyPath isEqualToString:@"operations"]) {
         if ([self.downloadQueue.operations count] == 0) {
@@ -2098,7 +2127,7 @@ typedef void (^DownloadCompletionBlock)();
                 {
                     if(!imgData){
                         NSError *error = [self createErrorWithCode:SyncErrorCodeDownloadFile
-                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@", nil), url]
+                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), className, aName]
                                                   andFailureReason:NSLocalizedString(@"No se ha descargado el contenido del fichero", nil)
                                              andRecoverySuggestion:NSLocalizedString(@"Compruebe la conexión o el fichero", nil)];
                         [self errorBlock:error fatal:NO];
@@ -2109,7 +2138,7 @@ typedef void (^DownloadCompletionBlock)();
                         [filemgr moveItemAtPath:urlTmp toPath:urlLocal error:&error];
                         if(error){
                             NSError *error = [self createErrorWithCode:SyncErrorCodeMoveFile
-                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido mover el fichero: %@", nil), url]
+                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido mover el fichero:  %@/%@", nil), className, aName]
                                                       andFailureReason:NSLocalizedString(@"No se ha podido mover el fichero a su ubicación definitiva", nil)
                                                  andRecoverySuggestion:NSLocalizedString(@"Compruebe el sistema de ficheros", nil)];
                             [self errorBlock:error fatal:NO];
@@ -2140,7 +2169,7 @@ typedef void (^DownloadCompletionBlock)();
         }
         else{
             NSError *error = [self createErrorWithCode:SyncErrorCodeDownloadFile
-                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@", nil), url]
+                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero:  %@/%@", nil), className, aName]
                                       andFailureReason:NSLocalizedString(@"No se ha descargado el contenido del fichero", nil)
                                  andRecoverySuggestion:NSLocalizedString(@"Compruebe la conexión o el fichero", nil)];
             [self errorBlock:error fatal:NO];
@@ -2162,7 +2191,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Comprueba si un fichero existe
--(BOOL)fileExistWithName: (NSString *) aName ofClass: (NSString *) aClass
+-(BOOL)fileExistWithName:(NSString *)aName ofClass:(NSString *)aClass
 {
     NSFileManager *filemgr = [NSFileManager defaultManager];
     NSString *className = [NSString stringWithFormat:@"%@%@", [[aClass substringToIndex:1] lowercaseString], [aClass substringFromIndex:1]];
@@ -2171,7 +2200,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Elimina un fichero
--(BOOL)removeFileWithName: (NSString *) aName ofClass: (NSString *) aClass
+-(BOOL)removeFileWithName:(NSString *)aName ofClass:(NSString *)aClass
 {
     NSFileManager *filemgr = [NSFileManager defaultManager];
     BOOL resultado = YES;
@@ -2328,14 +2357,16 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Convierte la fecha de MySQL a NSDate
-- (NSDate *)dateUsingStringFromAPI:(NSString *)dateString {
+- (NSDate *)dateUsingStringFromAPI:(NSString *)dateString
+{
     [self initializeDateFormatter];
     
     return [self.dateFormatter dateFromString:dateString];
 }
 
 //Convierte la fecha de NSDate a MySQL
-- (NSString *)dateStringForAPIUsingDate:(NSDate *)date {
+- (NSString *)dateStringForAPIUsingDate:(NSDate *)date
+{
     [self initializeDateFormatter];
     NSString *dateString = [self.dateFormatter stringFromDate:date];
     // remove Z
@@ -2349,14 +2380,16 @@ typedef void (^DownloadCompletionBlock)();
 
 #pragma mark - Log Utils
 
--(NSString *)logClassName:(NSString *)className {
+-(NSString *)logClassName:(NSString *)className
+{
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundeclared-selector"
     return [NSClassFromString(className) performSelector:@selector(localizedEntityName)];
 #pragma clang diagnostic pop
 }
 
--(void)logError:(NSString *)aMessage, ... {
+-(void)logError:(NSString *)aMessage, ...
+{
     @autoreleasepool {
         va_list args;
         va_start(args, aMessage);
@@ -2367,7 +2400,8 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
--(void)logInfo:(NSString *)aMessage, ... {
+-(void)logInfo:(NSString *)aMessage, ...
+{
     @autoreleasepool {
         va_list args;
         va_start(args, aMessage);
@@ -2378,7 +2412,8 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
--(void)logDebug:(NSString *)aMessage, ... {
+-(void)logDebug:(NSString *)aMessage, ...
+{
     @autoreleasepool {
         va_list args;
         va_start(args, aMessage);
