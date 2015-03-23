@@ -204,39 +204,19 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)checkStartConditionsNeedInstall:(BOOL)needInstall completionBlock:(void (^)())completionBlock
 {
-    self.context = [DMECoreDataStack sharedInstance].backgroundContext;
-    
-    [self.context performBlock:^{
-        if(!self.initialSyncComplete && needInstall){
-            //Si no esta instalado
-            NSError *error = [self createErrorWithCode:SyncErrorCodeInstalation
-                                        andDescription:NSLocalizedString(@"No se ha iniciado una instalación inicial", nil)
-                                      andFailureReason:NSLocalizedString(@"El método requiere de una instalación inicial", nil)
-                                 andRecoverySuggestion:NSLocalizedString(@"Realice primero una instalación inicial", nil)];
-            [self errorBlock:error fatal:YES];
-            [self executeSyncErrorOperations];
-            error = nil;
-        }
-        else{
-            if (!_syncInProgress && !_syncBlocked) {
-                if([AFNetworkReachabilityManager sharedManager].reachable){
-                    if(completionBlock){
+    if(self.initialSyncComplete || !needInstall){
+        if(!_syncInProgress && !_syncBlocked) {
+            if([AFNetworkReachabilityManager sharedManager].reachable){
+                if(completionBlock){
+                    self.context = [DMECoreDataStack sharedInstance].backgroundContext;
+                    
+                    [self.context performBlock:^{
                         completionBlock();
-                    }
-                }
-                else{
-                    //Si no tiene internet
-                    NSError *error = [self createErrorWithCode:SyncErrorCodeConnection
-                                                andDescription:NSLocalizedString(@"No tiene conexión a internet", nil)
-                                              andFailureReason:NSLocalizedString(@"Ha fallado al conectar con el servidor", nil)
-                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe su conexión", nil)];
-                    [self errorBlock:error fatal:YES];
-                    [self executeSyncErrorOperations];
-                    error = nil;
+                    }];
                 }
             }
         }
-    }];
+    }
 }
 
 #pragma mark - Start Sync
@@ -246,14 +226,15 @@ typedef void (^DownloadCompletionBlock)();
 -(void)startSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
     @autoreleasepool {
-        //Inicializamos la sincronizacion
-        self.startBlock = startBlock;
-        self.completionBlock = completionBlock;
-        self.progressBlock = progressBlock;
-        self.messageBlock = messageBlock;
-        self.errorBlock = errorBlock;
-        
         [self checkStartConditionsNeedInstall:NO completionBlock:^{
+            
+            //Inicializamos la sincronizacion
+            self.startBlock = startBlock;
+            self.completionBlock = completionBlock;
+            self.progressBlock = progressBlock;
+            self.messageBlock = messageBlock;
+            self.errorBlock = errorBlock;
+            
             [self executeSyncStartOperations:^{
                 NSInteger steps = 0;
                 if(self.initialSyncComplete){
@@ -298,7 +279,7 @@ typedef void (^DownloadCompletionBlock)();
 //Repite la sincronizacion periodicamente
 -(void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
-    if(!autoSyncTimer && !self.syncBlocked && self.autoSyncDelay > 0){
+    if(!autoSyncTimer && !self.autoSyncActive && !self.syncBlocked && self.autoSyncDelay > 0){
         self.autoSyncCompletionBlock = completionBlock;
         self.autoSyncStartBlock = startBlock;
         self.autoSyncMessageBlock = messageBlock;
@@ -319,14 +300,15 @@ typedef void (^DownloadCompletionBlock)();
 - (void)pushDataToServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
     @autoreleasepool {
-        //Inicializamos la sincronizacion
-        self.startBlock = startBlock;
-        self.completionBlock = completionBlock;
-        self.progressBlock = progressBlock;
-        self.messageBlock = messageBlock;
-        self.errorBlock = errorBlock;
-        
         [self checkStartConditionsNeedInstall:YES completionBlock:^{
+            
+            //Inicializamos la sincronizacion
+            self.startBlock = startBlock;
+            self.completionBlock = completionBlock;
+            self.progressBlock = progressBlock;
+            self.messageBlock = messageBlock;
+            self.errorBlock = errorBlock;
+            
             [self executeSyncStartOperations:^{
                 [self progressBlockTotal:3 inMainProcess:YES];
                 
@@ -343,14 +325,15 @@ typedef void (^DownloadCompletionBlock)();
 - (void)fetchDataFromServer:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
     @autoreleasepool {
-        //Inicializamos la sincronizacion
-        self.startBlock = startBlock;
-        self.completionBlock = completionBlock;
-        self.progressBlock = progressBlock;
-        self.messageBlock = messageBlock;
-        self.errorBlock = errorBlock;
-        
         [self checkStartConditionsNeedInstall:YES completionBlock:^{
+            
+            //Inicializamos la sincronizacion
+            self.startBlock = startBlock;
+            self.completionBlock = completionBlock;
+            self.progressBlock = progressBlock;
+            self.messageBlock = messageBlock;
+            self.errorBlock = errorBlock;
+            
             [self executeSyncStartOperations:^{
                 [self progressBlockTotal:4 inMainProcess:YES];
                 
@@ -368,6 +351,7 @@ typedef void (^DownloadCompletionBlock)();
 {
     @autoreleasepool {
         [self checkStartConditionsNeedInstall:YES completionBlock:^{
+            
             //Inicializamos la sincronizacion
             self.startBlock = startBlock;
             self.completionBlock = completionBlock;
@@ -414,15 +398,15 @@ typedef void (^DownloadCompletionBlock)();
         self.progressSubprocessTotal = 0;
         self.startDate = [NSDate date];
         
-        [self willChangeValueForKey:@"syncInProgress"];
-        _syncInProgress = YES;
-        [self didChangeValueForKey:@"syncInProgress"];
-        
         if(autoSyncTimer){
             [autoSyncTimer invalidate];
             autoSyncTimer = nil;
         }
         
+        [self willChangeValueForKey:@"syncInProgress"];
+        _syncInProgress = YES;
+        [self didChangeValueForKey:@"syncInProgress"];
+
         [self saveContext:^(BOOL result) {
             if(result){
                 if(self.startBlock){
@@ -445,12 +429,6 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         [self cleanEngine];
         
-        if(self.autoSyncActive){
-            dispatch_async(dispatch_get_main_queue(), ^{
-                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
-            });
-        }
-        
         [self messageBlock:NSLocalizedString(@"Proceso terminado", nil) important:YES];
         
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -459,6 +437,10 @@ typedef void (^DownloadCompletionBlock)();
             [self willChangeValueForKey:@"syncInProgress"];
             _syncInProgress = NO;
             [self didChangeValueForKey:@"syncInProgress"];
+            
+            if(self.autoSyncActive){
+                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+            }
             
             //Llamamos al bloque de completar
             if(self.completionBlock){
@@ -474,19 +456,18 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         [self cleanEngine];
         
-        if(self.autoSyncActive){
-            dispatch_async(dispatch_get_main_queue(), ^{
-                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
-            });
-        }
-        
         [self messageBlock:NSLocalizedString(@"Terminando proceso tras un error...", nil) important:YES];
         
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:SyncEngineSyncErrorNotificationName object:nil];
+            
             [self willChangeValueForKey:@"syncInProgress"];
             _syncInProgress = NO;
             [self didChangeValueForKey:@"syncInProgress"];
+            
+            if(self.autoSyncActive){
+                autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+            }
         });
     }
 }
