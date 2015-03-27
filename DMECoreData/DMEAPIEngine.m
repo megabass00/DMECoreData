@@ -10,7 +10,8 @@
 
 @implementation DMEAPIEngine
 
-+ (instancetype)sharedInstance {
++ (instancetype)sharedInstance
+{
     static DMEAPIEngine *_sharedInstance = nil;
     if(URLAPI && ![URLAPI isEqualToString:@""]){
         static dispatch_once_t onceToken;
@@ -26,7 +27,8 @@
     return _sharedInstance;
 }
 
-- (instancetype)init {
+- (instancetype)init
+{
     self = [self initWithBaseURL:[NSURL URLWithString:URLAPI]];
     
     if (!self) return nil;

@@ -175,7 +175,9 @@ typedef void (^DownloadCompletionBlock)();
 -(void)unblockSync
 {
     if(_syncBlocked){
-        autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+        if(self.autoSyncActive){
+            autoSyncTimer = [NSTimer scheduledTimerWithTimeInterval:self.autoSyncDelay target:self selector:@selector(autoSyncRepeat:) userInfo:nil repeats:YES];
+        }
         
         [self willChangeValueForKey:@"syncBlocked"];
         _syncBlocked = NO;
@@ -279,7 +281,7 @@ typedef void (^DownloadCompletionBlock)();
 //Repite la sincronizacion periodicamente
 -(void)autoSync:(SyncStartBlock)startBlock withCompletionBlock:(SyncCompletionBlock)completionBlock withProgressBlock:(ProgressBlock)progressBlock withMessageBlock:(MessageBlock)messageBlock withErrorBlock:(ErrorBlock)errorBlock
 {
-    if(!autoSyncTimer && !self.autoSyncActive && !self.syncBlocked && self.autoSyncDelay > 0){
+    if(!autoSyncTimer && !self.autoSyncActive && self.autoSyncDelay > 0){
         self.autoSyncCompletionBlock = completionBlock;
         self.autoSyncStartBlock = startBlock;
         self.autoSyncMessageBlock = messageBlock;
@@ -398,7 +400,7 @@ typedef void (^DownloadCompletionBlock)();
         self.progressSubprocessTotal = 0;
         self.startDate = [NSDate date];
         
-        if(autoSyncTimer){
+        if(autoSyncTimer && self.autoSyncActive){
             [autoSyncTimer invalidate];
             autoSyncTimer = nil;
         }
@@ -1493,7 +1495,7 @@ typedef void (^DownloadCompletionBlock)();
                                     
                                     [api pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
                                         [self.context performBlock:^{
-                                            if(!error){
+                                            if(!error && object){
                                                 if(object.count > 0){
                                                     for (NSString* key in object) {
                                                         @autoreleasepool {
@@ -1657,7 +1659,7 @@ typedef void (^DownloadCompletionBlock)();
                                         
                                         [api updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
                                             [self.context performBlockAndWait:^{
-                                                if(!error){
+                                                if(!error && object){
                                                     if(object.count > 0){
                                                         for (NSString* key in object) {
                                                             @autoreleasepool {
@@ -1804,7 +1806,7 @@ typedef void (^DownloadCompletionBlock)();
                                     
                                     [api deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
                                         [self.context performBlockAndWait:^{
-                                            if(!error){
+                                            if(!error && object){
                                                 if(object.count > 0 && [[object objectForKey:className] valueForKey:@"id"]){
                                                     //Delete object in Core Data
                                                     [self.context deleteObject:[objectToDelete objectInContext:self.context]];
