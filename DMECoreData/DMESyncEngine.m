@@ -882,8 +882,9 @@ typedef void (^DownloadCompletionBlock)();
         } else {
             predicate = [NSPredicate predicateWithFormat:@"NOT (id IN %@)", idArray];
         }
+        NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
         NSPredicate *syncPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectNotSync]}];
-        NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:syncPredicate, predicate, nil]];
+        NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:syncPredicate, createdPredicate, predicate, nil]];
         
         [fetchRequest setPredicate:andPredicate];
         [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"id" ascending:YES selector:@selector(localizedStandardCompare:)]]];
@@ -967,7 +968,7 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         if(aDate){
             //TODO: Optimizar a fuego
-            NSPredicate *pred = [NSPredicate predicateWithFormat:@"NOT(%K.id IN %@) OR %K.modified > %@", className, [[self managedObjectsForClass:className] valueForKey:@"id"], className, [aDate description]];
+            NSPredicate *pred = [NSPredicate predicateWithFormat:@"NOT (%K.id IN %@) OR %K.modified > %@", className, [[self managedObjectsForClass:className] valueForKey:@"id"], className, [aDate description]];
             return [[self.JSONRecords objectForKey:className] filteredArrayUsingPredicate:pred];
         }
         else{
