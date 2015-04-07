@@ -2234,7 +2234,7 @@ typedef void (^DownloadCompletionBlock)();
                     [self errorBlock:error fatal:NO];
                 }
                 else{
-                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Cache de %@ limpiada", nil), [self logClassName:className]] important:NO];
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Cache de %@ limpiada", nil), [self logClassName:aClass]] important:NO];
                 }
             }
         }
