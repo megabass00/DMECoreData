@@ -969,10 +969,10 @@ typedef void (^DownloadCompletionBlock)();
         if(aDate){
             //TODO: Optimizar a fuego
             NSPredicate *pred = [NSPredicate predicateWithFormat:@"NOT (%K.id IN %@) OR %K.modified > %@", className, [[self managedObjectsForClass:className] valueForKey:@"id"], className, [aDate description]];
-            return [[self.JSONRecords objectForKey:className] filteredArrayUsingPredicate:pred];
+            return [(NSArray *)[self.JSONRecords objectForKey:className] filteredArrayUsingPredicate:pred];
         }
         else{
-            return [self.JSONRecords objectForKey:className];
+            return (NSArray *)[self.JSONRecords objectForKey:className];
         }
     }
 }

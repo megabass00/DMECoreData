@@ -195,8 +195,7 @@ static DMECoreDataStack *sharedInstance = nil;
 -(id)initWithModelName:(NSString *)aModelName databaseURL:(NSURL*) aDBURL
 {
     if (self = [super init]) {
-        self.modelURL = [[NSBundle mainBundle] URLForResource:aModelName
-                                                withExtension:@"momd"];
+        self.modelURL = [[NSBundle mainBundle] URLForResource:aModelName withExtension:@"momd"];
         self.dbURL = aDBURL;
         self.threadsContexts = [NSMutableDictionary dictionary];
     }
