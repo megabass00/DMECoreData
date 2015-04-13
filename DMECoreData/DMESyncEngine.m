@@ -581,10 +581,13 @@ typedef void (^DownloadCompletionBlock)();
         NSEntityDescription *entityDescription = [[managedObject objectInContext:self.context] entity];
         NSDictionary *relationsDictionary = [entityDescription relationshipsByName];
         
-        NSString *inverseRelationName = [[[[relationsDictionary allValues] filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
-            NSRelationshipDescription *relationship = (NSRelationshipDescription *)evaluatedObject;
-            return [[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName];
-        }]] firstObject] name];
+        NSString *inverseRelationName;
+        for(NSRelationshipDescription *relationship in [relationsDictionary allValues]) {
+            if([[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName]){
+                inverseRelationName = [relationship name];
+                break;
+            }
+        }
         
         //Comprobamos que exista la relación
         NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
@@ -678,10 +681,13 @@ typedef void (^DownloadCompletionBlock)();
             NSEntityDescription *entityDescription = [managedObject entity];
             NSDictionary *relationsDictionary = [entityDescription relationshipsByName];
             
-            NSString *inverseRelationName = [[[[relationsDictionary allValues] filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
-                NSRelationshipDescription *relationship = (NSRelationshipDescription *)evaluatedObject;
-                return [[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName];
-            }]] firstObject] name];
+            NSString *inverseRelationName;
+            for(NSRelationshipDescription *relationship in [relationsDictionary allValues]) {
+                if([[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName]){
+                    inverseRelationName = [relationship name];
+                    break;
+                }
+            }
             
             //Comprobamos si la relacion es a uno o a varios
             if([relationsDictionary objectForKey:inverseRelationName]){
@@ -849,7 +855,6 @@ typedef void (^DownloadCompletionBlock)();
     }
 }
 
-
 //Obtiene el objeto Core Data con un id
 -(NSManagedObject *)managedObjectForClass:(NSString *)className withId:(NSString *)aId
 {
@@ -901,6 +906,26 @@ typedef void (^DownloadCompletionBlock)();
         fetchRequest = nil;
         
         return results;
+    }
+}
+
+-(NSDate *)lastModifiedDateForClass:(NSString *)className
+{
+    @autoreleasepool {
+        NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
+        [fetchRequest setFetchLimit:1];
+        [fetchRequest setPredicate:[NSPredicate predicateWithFormat:@"modified != nil"]];
+        [fetchRequest setSortDescriptors:[NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"modified" ascending:NO]]];
+        
+        __block NSManagedObject *object = nil;
+        [self.context performBlockAndWait:^{
+            NSError *error = nil;
+            object = [[self.context executeFetchRequest:fetchRequest error:&error] lastObject];
+        }];
+        
+        fetchRequest = nil;
+        
+        return (NSDate *)[object valueForKey:@"modified"];
     }
 }
 
@@ -967,9 +992,13 @@ typedef void (^DownloadCompletionBlock)();
 {
     @autoreleasepool {
         if(aDate){
-            //TODO: Optimizar a fuego
-            NSPredicate *pred = [NSPredicate predicateWithFormat:@"NOT (%K.id IN %@) OR %K.modified > %@", className, [[self managedObjectsForClass:className] valueForKey:@"id"], className, [aDate description]];
-            return [(NSArray *)[self.JSONRecords objectForKey:className] filteredArrayUsingPredicate:pred];
+            NSMutableArray *filtered = [NSMutableArray array];
+            for (NSDictionary *obj in [self.JSONRecords objectForKey:className]) {
+                if([self dateUsingStringFromAPI:obj[className][@"modified"]] > aDate) {
+                    [filtered addObject:obj];
+                }
+            }
+            return filtered;
         }
         else{
             return (NSArray *)[self.JSONRecords objectForKey:className];
@@ -1229,7 +1258,7 @@ typedef void (^DownloadCompletionBlock)();
                 // Otherwise you need to do some more logic to determine if the record is new or has been updated.
                 // First get the downloaded records from the JSON response, verify there is at least one object in
                 // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
-                [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id"] forKey:className];
+                [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]] forKey:className];
             }
             total += [(NSArray *)[JSONData objectForKey:className] count];
         }
@@ -1259,76 +1288,78 @@ typedef void (^DownloadCompletionBlock)();
                 }
             }
             else {
-                NSArray *storedManagedObjects = [self managedObjectsForClass:className withPredicate:[NSPredicate predicateWithFormat:@"id != nil"]];
-                
-                NSEnumerator *JSONEnumerator = [[JSONData objectForKey:className] objectEnumerator];
-                NSEnumerator *fetchResultsEnumerator = [storedManagedObjects objectEnumerator];
-                
-                NSDictionary *record = [JSONEnumerator nextObject];
-                NSManagedObject *storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
-                
-                while (record) {
-                    @autoreleasepool {
-                        NSString *id = nil;
-                        
-                        if([[record objectForKey:className] isKindOfClass:[NSDictionary class]]){
-                            id = [[record objectForKey:className] valueForKey:@"id"];
-                        }
-                        
-                        if(id && ![id isEqualToString:@""]){
-                            if([id isEqualToString:[storedManagedObject valueForKey:@"id"]]){
-                                if(([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending) || [storedManagedObject valueForKey:@"modified"] == nil){
-                                    [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
-                                }
-                                
-                                //Avanzamos ambos cursores
-                                record = [JSONEnumerator nextObject];
-                                storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
-                                
-                                [self progressBlockIncrementInMainProcess:NO];
+                if([[JSONData valueForKey:className] count] > 0){
+                    NSArray *storedManagedObjects = [self managedObjectsForClass:className withPredicate:[NSPredicate predicateWithFormat:@"id IN %@", [[[JSONData valueForKey:className] valueForKey:className] valueForKey:@"id"]]];
+                    
+                    NSEnumerator *JSONEnumerator = [[JSONData objectForKey:className] objectEnumerator];
+                    NSEnumerator *fetchResultsEnumerator = [storedManagedObjects objectEnumerator];
+                    
+                    NSDictionary *record = [JSONEnumerator nextObject];
+                    NSManagedObject *storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+                    
+                    while (record) {
+                        @autoreleasepool {
+                            NSString *id = nil;
+                            
+                            if([[record objectForKey:className] isKindOfClass:[NSDictionary class]]){
+                                id = [[record objectForKey:className] valueForKey:@"id"];
                             }
-                            else{
-                                if([self existsManagedObjectForClass:className withId:id]){
-                                    storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
-                                }
-                                else{
-                                    [self newManagedObjectWithClassName:className forRecord:record];
+                            
+                            if(id && ![id isEqualToString:@""]){
+                                if([id isEqualToString:[storedManagedObject valueForKey:@"id"]]){
+                                    if(([[self dateUsingStringFromAPI:[[record objectForKey:className] valueForKey:@"modified"]] compare:[storedManagedObject valueForKey:@"modified"]] == NSOrderedDescending) || [storedManagedObject valueForKey:@"modified"] == nil){
+                                        [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
+                                    }
+                                    
+                                    //Avanzamos ambos cursores
                                     record = [JSONEnumerator nextObject];
+                                    storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
                                     
                                     [self progressBlockIncrementInMainProcess:NO];
                                 }
-                            }
-                        }
-                        else{
-                            NSError *errorSync = [self createErrorWithCode:SyncErrorCodeNoId
-                                                            andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada de %@ no tiene ID", nil), [self logClassName:className]]
-                                                          andFailureReason:NSLocalizedString(@"La entidad descargada no tiene ID", nil)
-                                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
-                            
-                            if(self.initialSyncComplete){
-                                [self errorBlock:errorSync fatal:NO];
-                                
-                                if(completionBlock){
-                                    completionBlock();
+                                else{
+                                    if([self existsManagedObjectForClass:className withId:id]){
+                                        storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+                                    }
+                                    else{
+                                        [self newManagedObjectWithClassName:className forRecord:record];
+                                        record = [JSONEnumerator nextObject];
+                                        
+                                        [self progressBlockIncrementInMainProcess:NO];
+                                    }
                                 }
                             }
                             else{
-                                [self errorBlock:errorSync fatal:YES];
-                                [self executeSyncErrorOperations];
+                                NSError *errorSync = [self createErrorWithCode:SyncErrorCodeNoId
+                                                                andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada de %@ no tiene ID", nil), [self logClassName:className]]
+                                                              andFailureReason:NSLocalizedString(@"La entidad descargada no tiene ID", nil)
+                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
+                                
+                                if(self.initialSyncComplete){
+                                    [self errorBlock:errorSync fatal:NO];
+                                    
+                                    if(completionBlock){
+                                        completionBlock();
+                                    }
+                                }
+                                else{
+                                    [self errorBlock:errorSync fatal:YES];
+                                    [self executeSyncErrorOperations];
+                                }
+                                
+                                errorSync = nil;
+                                
+                                return;
                             }
-                            
-                            errorSync = nil;
-                            
-                            return;
                         }
                     }
+                    
+                    storedManagedObjects = nil;
+                    JSONEnumerator = nil;
+                    fetchResultsEnumerator = nil;
+                    record = nil;
+                    storedManagedObject = nil;
                 }
-                
-                storedManagedObjects = nil;
-                JSONEnumerator = nil;
-                fetchResultsEnumerator = nil;
-                record = nil;
-                storedManagedObject = nil;
             }
             
             [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ guardada", nil), [self logClassName:className]] important:NO];
@@ -2332,7 +2363,8 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - Date Utils
 
 //Inicializa el formateador de fechas
-- (void)initializeDateFormatter {
+-(void)initializeDateFormatter
+{
     if (!self.dateFormatter) {
         self.dateFormatter = [[NSDateFormatter alloc] init];
         [self.dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
@@ -2341,7 +2373,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Convierte la fecha de MySQL a NSDate
-- (NSDate *)dateUsingStringFromAPI:(NSString *)dateString
+-(NSDate *)dateUsingStringFromAPI:(NSString *)dateString
 {
     [self initializeDateFormatter];
     
@@ -2349,7 +2381,7 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Convierte la fecha de NSDate a MySQL
-- (NSString *)dateStringForAPIUsingDate:(NSDate *)date
+-(NSString *)dateStringForAPIUsingDate:(NSDate *)date
 {
     [self initializeDateFormatter];
     NSString *dateString = [self.dateFormatter stringFromDate:date];
