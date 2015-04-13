@@ -7,6 +7,7 @@
 //
 
 #import "DMECoreData.h"
+#import <AFNetworking.h>
 
 NSString * const SyncEngineInitialCompleteKey = @"SyncEngineInitialSyncCompleted";
 NSString * const SyncEngineSyncCompletedNotificationName = @"SyncEngineSyncCompleted";
@@ -931,9 +932,10 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)saveContext:(void (^)(BOOL result))success
 {
-    [self.context performBlockAndWait:^{
-        @autoreleasepool {
+    @autoreleasepool {
+        [self.context performBlockAndWait:^{
             BOOL result = YES;
+            
             
             if(self.context.hasChanges){
                 // Execute the sync completion operations as this is now the final step of the sync process
@@ -947,10 +949,10 @@ typedef void (^DownloadCompletionBlock)();
                     //NSLog(@"Unresolved error %@", [error localizedDescription]);
                     
                     NSError *errorFinal = [self createErrorWithCode:SyncErrorCodeSaveContext
-                                                andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
-                                              andFailureReason:[error description]
-                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
-
+                                                     andDescription:NSLocalizedString(@"No se han podido guardar los datos", nil)
+                                                   andFailureReason:[error description]
+                                              andRecoverySuggestion:NSLocalizedString(@"Compruebe la integridad de los datos", nil)];
+                    
                     [self errorBlock:errorFinal fatal:YES];
                     [self executeSyncErrorOperations];
                     errorFinal = nil;
@@ -975,8 +977,8 @@ typedef void (^DownloadCompletionBlock)();
                     }
                 }];
             }
-        }
-    }];
+        }];
+    }
 }
 
 #pragma mark - JSON Data Management
@@ -2009,6 +2011,9 @@ typedef void (^DownloadCompletionBlock)();
     self.downloadQueue.name = @"Download Files Queue";
     self.downloadQueue.MaxConcurrentOperationCount = MaxConcurrentDownload;
     
+    NSMutableArray *requestArray = [NSMutableArray array];
+    downloadCompletionAuxBlock = completionBlock;
+    
     //Thumbnails
     [DMEThumbnailer sharedInstance].sizes = thumbnailSize();
     
@@ -2026,46 +2031,60 @@ typedef void (^DownloadCompletionBlock)();
     for (NSDictionary *file in self.filesToDownload) {
         @autoreleasepool {
             // Add an operation as a block to a queue
-            [self.downloadQueue addOperationWithBlock: ^ {
-                BOOL downloaded = YES;
-                if(![self fileExistWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]]){
-                    downloaded = [self downloadFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
-                    [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
-                }
-                
-                //Descargamos el fichero
+            NSFileManager *filemgr = [NSFileManager defaultManager];
+            
+            //Creamos la URL remota y local
+            NSString *className = [NSString stringWithFormat:@"%@%@", [[[file objectForKey:@"classname"] substringToIndex:1] lowercaseString], [[file objectForKey:@"classname"] substringFromIndex:1]];
+            NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@/%@", URLUploads, className, [file objectForKey:@"url"]]];
+            NSString *urlDirectorio = [NSString stringWithFormat:@"%@/%@", pathCache(), className];
+            NSString *tmpName = [[NSUUID new] UUIDString];
+            NSString *urlTmp = [NSString stringWithFormat:@"%@/%@", NSTemporaryDirectory(), tmpName];
+            NSString *urlLocal = [NSString stringWithFormat:@"%@/%@", urlDirectorio, [file objectForKey:@"url"]];
+            
+            //Cambiamos al directorio de cache
+            if([filemgr changeCurrentDirectoryPath:urlDirectorio] == NO){
+                [filemgr createDirectoryAtPath:urlDirectorio withIntermediateDirectories:YES attributes: nil error: NULL];
+            }
+            
+            //Creamos la operacion de descarga
+            AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:url]];
+            op.outputStream = [NSOutputStream outputStreamToFileAtPath:urlLocal append:NO];
+            op.queuePriority = NSOperationQueuePriorityHigh;
+            
+            [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
+            
+            [op setCompletionBlock:^{
+                [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
                 self.downloadedFiles++;
                 
                 [self progressBlockIncrementInMainProcess:NO];
                 
-                if(downloaded){
-                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
-                }
-                else{
-                    
-                }
+                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
             }];
+            [requestArray addObject:op];
         }
     }
     
-    downloadCompletionAuxBlock = completionBlock;
-    [self.downloadQueue addObserver:self forKeyPath:@"operations" options:0 context:NULL];
-}
+    NSArray *batches = [AFURLConnectionOperation batchOfRequestOperations:requestArray progressBlock:^(NSUInteger numberOfFinishedOperations, NSUInteger totalNumberOfOperations) {} completionBlock:^(NSArray *operations) {
+        
+        [self messageBlock:NSLocalizedString(@"Se han descargado todos los ficheros", nil) important:YES];
+        [self progressBlockIncrementInMainProcess:YES];
+        
+        [self.context performBlock:^{
+            if(downloadCompletionAuxBlock){
+                downloadCompletionAuxBlock();
+                downloadCompletionAuxBlock = nil;
+            }
+        }];
+    }];
 
--(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
-{
-    if (object == self.downloadQueue && [keyPath isEqualToString:@"operations"]) {
-        if ([self.downloadQueue.operations count] == 0) {
-            // Do whatever you need to do when all requests are finished
-            [self messageBlock:NSLocalizedString(@"Se han descargado todos los ficheros", nil) important:YES];
-            [self progressBlockIncrementInMainProcess:YES];
-            
-            [self.context performBlock:^{
-                if(downloadCompletionAuxBlock){
-                    downloadCompletionAuxBlock();
-                    downloadCompletionAuxBlock = nil;
-                }
-            }];
+    if(batches.count > 0){
+        [self.downloadQueue addOperations:batches waitUntilFinished:YES];
+    }
+    else{
+        if(downloadCompletionAuxBlock){
+            downloadCompletionAuxBlock();
+            downloadCompletionAuxBlock = nil;
         }
     }
     
@@ -2107,102 +2126,6 @@ typedef void (^DownloadCompletionBlock)();
     urlLocal = nil;
     urlDirectorio = nil;
     className = nil;
-}
-
-
-//Descarga un fichero
--(BOOL)downloadFileWithName:(NSString *)aName ofClass:(NSString *)aClass
-{
-    NSFileManager *filemgr = [NSFileManager defaultManager];
-    
-    //Creamos la URL remota y local
-    NSString *className = [NSString stringWithFormat:@"%@%@", [[aClass substringToIndex:1] lowercaseString], [aClass substringFromIndex:1]];
-    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@/%@", URLUploads, className, aName]];
-    NSString *urlDirectorio = [NSString stringWithFormat:@"%@/%@", pathCache(), className];
-    NSString *tmpName = [[NSUUID new] UUIDString];
-    NSString *urlTmp = [NSString stringWithFormat:@"%@/%@", NSTemporaryDirectory(), tmpName];
-    NSString *urlLocal = [NSString stringWithFormat:@"%@/%@", urlDirectorio, aName];
-    
-    NSError *error = nil;
-    BOOL resultado = YES;
-    
-    if(url){
-        NSData *imgData = [NSData dataWithContentsOfURL:url options:0 error:&error];
-        
-        if(!error){
-            if(filemgr){
-                [filemgr createFileAtPath: urlTmp contents:imgData attributes:nil];
-                
-                //Cambiamos al directorio de cache
-                if([filemgr changeCurrentDirectoryPath: urlDirectorio] == NO){
-                    [filemgr createDirectoryAtPath: urlDirectorio withIntermediateDirectories: YES attributes: nil error: NULL];
-                }
-                
-                if ([filemgr changeCurrentDirectoryPath: urlDirectorio] == YES)
-                {
-                    if(!imgData){
-                        NSError *error = [self createErrorWithCode:SyncErrorCodeDownloadFile
-                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), className, aName]
-                                                  andFailureReason:NSLocalizedString(@"No se ha descargado el contenido del fichero", nil)
-                                             andRecoverySuggestion:NSLocalizedString(@"Compruebe la conexión o el fichero", nil)];
-                        [self errorBlock:error fatal:NO];
-                        
-                        resultado = NO;
-                    }
-                    else {
-                        [filemgr moveItemAtPath:urlTmp toPath:urlLocal error:&error];
-                        if(error){
-                            NSError *error = [self createErrorWithCode:SyncErrorCodeMoveFile
-                                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido mover el fichero:  %@/%@", nil), className, aName]
-                                                      andFailureReason:NSLocalizedString(@"No se ha podido mover el fichero a su ubicación definitiva", nil)
-                                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe el sistema de ficheros", nil)];
-                            [self errorBlock:error fatal:NO];
-                            
-                            resultado = NO;
-                        }
-                    }
-                }
-                else{
-                    NSError *error = [self createErrorWithCode:SyncErrorCodeOpenDirectory
-                                                andDescription:NSLocalizedString(@"No se ha podido abrir el directorio", nil)
-                                              andFailureReason:NSLocalizedString(@"No se ha podido acceder al directorio de destino", nil)
-                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe el sistema de ficheros", nil)];
-                    [self errorBlock:error fatal:NO];
-                    
-                    resultado = NO;
-                }
-            }
-            else{
-                NSError *error = [self createErrorWithCode:SyncErrorCodeOpenFile
-                                            andDescription:NSLocalizedString(@"No se ha podido abrir el fichero", nil)
-                                          andFailureReason:NSLocalizedString(@"No se ha podido acceder al fichero de destino", nil)
-                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe el sistema de ficheros", nil)];
-                [self errorBlock:error fatal:NO];
-                
-                resultado = NO;
-            }
-        }
-        else{
-            NSError *error = [self createErrorWithCode:SyncErrorCodeDownloadFile
-                                        andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero:  %@/%@", nil), className, aName]
-                                      andFailureReason:NSLocalizedString(@"No se ha descargado el contenido del fichero", nil)
-                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe la conexión o el fichero", nil)];
-            [self errorBlock:error fatal:NO];
-            
-            resultado = NO;
-        }
-    }
-    else{
-        NSError *error = [self createErrorWithCode:SyncErrorCodeURLContainIllegalCharacters
-                                    andDescription:NSLocalizedString(@"La URL puede contener caracteres ilegales", nil)
-                                  andFailureReason:NSLocalizedString(@"No se admiten espacios y carácteres especiales en la URL", nil)
-                             andRecoverySuggestion:NSLocalizedString(@"Compruebe el nombre del fichero", nil)];
-        [self errorBlock:error fatal:NO];
-        
-        resultado = NO;
-    }
-    
-    return resultado;
 }
 
 //Comprueba si un fichero existe
