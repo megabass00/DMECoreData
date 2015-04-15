@@ -593,21 +593,19 @@ typedef void (^DownloadCompletionBlock)();
         //Comprobamos que exista la relación
         NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
         if(relationDescription && [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]){
-            //Comprobamos si la relacion es a uno o a varios
-            if(relationDescription.isToMany){
+            
+            //Si son traducciones las eliminamos
+            if(relationDescription.isToMany && [inverseRelationName containsString:@"Translation"]){
                 //Eliminamos los objetos de la relación
                 for (NSManagedObject *relationObject in [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]) {
                     @autoreleasepool {
-                        [relationObject deleteEntityInContext:self.context];
+                        [self.context deleteObject:relationObject];
                     }
                 }
             }
-            else{
-                //Ponemos la relación a nil
-                NSManagedObject *relationObject = [[managedObject objectInContext:self.context] valueForKey:inverseRelationName];
-                [relationObject deleteEntityInContext:self.context];
-                relationObject = nil;
-            }
+            
+            //Eliminamos la relacion
+            [managedObject setValue:nil forKey:inverseRelationName];
         }
         
         values = nil;
@@ -996,7 +994,7 @@ typedef void (^DownloadCompletionBlock)();
         if(aDate){
             NSMutableArray *filtered = [NSMutableArray array];
             for (NSDictionary *obj in [self.JSONRecords objectForKey:className]) {
-                if([self dateUsingStringFromAPI:obj[className][@"modified"]] > aDate) {
+                if([[self dateUsingStringFromAPI:obj[className][@"modified"]] compare:aDate] == NSOrderedDescending ) {
                     [filtered addObject:obj];
                 }
             }
@@ -1074,7 +1072,7 @@ typedef void (^DownloadCompletionBlock)();
                                 BOOL delete = [[entity valueForKey:@"delete"] boolValue];
                                 
                                 //Añadimos la entidad para sincronizar
-                                if([self.registeredClassesToSync containsObject:className]){
+                                if([self.registeredClassesToSync containsObject:className] && ![self.classesToSync containsObject:className]){
                                     [self.classesToSync addObject:className];
                                 }
                                 
@@ -1082,7 +1080,7 @@ typedef void (^DownloadCompletionBlock)();
                                 if(delete){
                                     for (NSManagedObject *object in [self managedObjectsForClass:className withSyncStatus:ObjectSynced]) {
                                         @autoreleasepool {
-                                            [object deleteEntityInContext:self.context];
+                                            [self.context deleteObject:object];
                                         }
                                     }
                                 }
