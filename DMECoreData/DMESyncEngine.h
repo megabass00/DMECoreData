@@ -41,6 +41,7 @@ typedef NS_ENUM(NSUInteger, SyncErrorCode) {
     SyncErrorCodeURLContainIllegalCharacters = 16,
     SyncErrorCodeCleanCache = 17,
     SyncErrorCodeCleanThumbsCache = 18,
+    SyncErrorCodeJSON = 19,
 };
 
 typedef void (^SyncStartBlock)();
