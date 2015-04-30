@@ -24,7 +24,6 @@ typedef void (^DownloadCompletionBlock)();
     NSPredicate *syncStatusNotPredicateTemplate;
     DownloadCompletionBlock downloadCompletionAuxBlock;
     NSMutableDictionary *savedEntities;
-    NSMutableArray *filesToDownload;
     NSTimer *autoSyncTimer;
 }
 
@@ -36,6 +35,8 @@ typedef void (^DownloadCompletionBlock)();
 @property (nonatomic, strong) __block NSMutableArray *registeredClassesWithOptionalFiles;
 
 @property (nonatomic, strong) NSDateFormatter *dateFormatter;
+@property (nonatomic, strong) NSMutableDictionary *JSONRecords;
+@property (nonatomic, strong) __block NSMutableArray *filesToDownload;
 @property (nonatomic, strong) __block NSOperationQueue *downloadQueue;
 @property (nonatomic) __block NSInteger downloadedFiles;
 @property (nonatomic) __block CGFloat progressTotal;
@@ -43,17 +44,17 @@ typedef void (^DownloadCompletionBlock)();
 @property (nonatomic) __block CGFloat progressSubprocessTotal;
 @property (nonatomic) __block CGFloat progressSubprocessCurrent;
 
-@property (nonatomic, strong) SyncStartBlock startBlock;
-@property (nonatomic, strong) SyncCompletionBlock completionBlock;
-@property (nonatomic, strong) ErrorBlock errorBlock;
-@property (nonatomic, strong) ProgressBlock progressBlock;
-@property (nonatomic, strong) MessageBlock messageBlock;
+@property (nonatomic, copy) SyncStartBlock startBlock;
+@property (nonatomic, copy) SyncCompletionBlock completionBlock;
+@property (nonatomic, copy) ErrorBlock errorBlock;
+@property (nonatomic, copy) ProgressBlock progressBlock;
+@property (nonatomic, copy) MessageBlock messageBlock;
 
-@property (nonatomic, strong) SyncStartBlock autoSyncStartBlock;
-@property (nonatomic, strong) SyncCompletionBlock autoSyncCompletionBlock;
-@property (nonatomic, strong) ErrorBlock autoSyncErrorBlock;
-@property (nonatomic, strong) ProgressBlock autoSyncProgressBlock;
-@property (nonatomic, strong) MessageBlock autoSyncMessageBlock;
+@property (nonatomic, copy) SyncStartBlock autoSyncStartBlock;
+@property (nonatomic, copy) SyncCompletionBlock autoSyncCompletionBlock;
+@property (nonatomic, copy) ErrorBlock autoSyncErrorBlock;
+@property (nonatomic, copy) ProgressBlock autoSyncProgressBlock;
+@property (nonatomic, copy) MessageBlock autoSyncMessageBlock;
 
 @property (nonatomic, strong) NSDate *startDate;
 
@@ -391,7 +392,8 @@ typedef void (^DownloadCompletionBlock)();
             [self messageBlock:NSLocalizedString(@"Comenzando la instalación...", nil) important:YES];
         }
         
-        filesToDownload = [NSMutableArray array];
+        self.filesToDownload = [NSMutableArray array];
+        self.JSONRecords = [NSMutableDictionary dictionary];
         self.downloadedFiles = 0;
         self.progressCurrent = 0;
         self.progressTotal = 0;
@@ -931,14 +933,6 @@ typedef void (^DownloadCompletionBlock)();
     
     [self.context performBlockAndWait:^{
         @autoreleasepool {
-            
-            if(!self.initialSyncComplete){
-                [self.context performBlock:^{
-                    for (NSManagedObject *mo in self.context.registeredObjects)
-                        [self.context refreshObject:mo mergeChanges:NO];
-                }];
-            }
-            
             BOOL result = YES;
             
             if(self.context.hasChanges){
@@ -988,18 +982,18 @@ typedef void (^DownloadCompletionBlock)();
 #pragma mark - JSON Data Management
 
 //Devuelve los valores descargados para una clase
--(NSArray *)JSONArrayForClassWithName:(NSString *)className withData:(NSDictionary *)data
+-(NSArray *)JSONArrayForClassWithName:(NSString *)className
 {
-    return [self JSONArrayForClassWithName:className modifiedAfter:nil withData:data];
+    return [self JSONArrayForClassWithName:className modifiedAfter:nil];
 }
 
 //Devuelve los valores descargados para una clase modificados a partir de una fecha o que no esten en la base de datos
--(NSArray *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate withData:(NSDictionary *)data
+-(NSArray *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate
 {
     @autoreleasepool {
         if(aDate){
             NSMutableArray *filtered = [NSMutableArray array];
-            for (NSDictionary *obj in [data objectForKey:className]) {
+            for (NSDictionary *obj in [self.JSONRecords objectForKey:className]) {
                 if([[self dateUsingStringFromAPI:obj[className][@"modified"]] compare:aDate] == NSOrderedDescending ) {
                     [filtered addObject:obj];
                 }
@@ -1007,37 +1001,41 @@ typedef void (^DownloadCompletionBlock)();
             return filtered;
         }
         else{
-            return (NSArray *)[data objectForKey:className];
+            return (NSArray *)[self.JSONRecords objectForKey:className];
         }
     }
 }
 
 //Devuelve los valores descargados para una clase ordenados por un campo
--(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key withData:(NSDictionary *)data
+-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key
 {
-    return [self JSONDataRecordsForClass:className sortedByKey:key modifiedAfter:nil withData:data];
+    return [self JSONDataRecordsForClass:className sortedByKey:key modifiedAfter:nil];
 }
 
 //Devuelve los valores descargados para una clase ordenados por un campo y modificados a partir de una fecha
--(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate withData:(NSDictionary *)data
+-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate
 {
-    NSArray *JSONArray = [self JSONArrayForClassWithName:className modifiedAfter:aDate withData:data] ;
+    NSArray *JSONArray = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
     NSArray *result = [JSONArray sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
         @autoreleasepool {
             if([[[(NSDictionary*)a objectForKey:className] objectForKey:key] isKindOfClass:[NSString class]]){
-                NSString *first = [[(NSDictionary*)a objectForKey:className] objectForKey:key];
-                NSString *second = [[(NSDictionary*)b objectForKey:className] objectForKey:key];
-                
-                return [first localizedStandardCompare:second];
+                @autoreleasepool {
+                    NSString *first = [[(NSDictionary*)a objectForKey:className] objectForKey:key];
+                    NSString *second = [[(NSDictionary*)b objectForKey:className] objectForKey:key];
+                    
+                    return [first localizedStandardCompare:second];
+                }
             }
             else{
-                NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
-                NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
-                if (first > second)
-                    return NSOrderedDescending;
-                if (first < second)
-                    return NSOrderedAscending;
-                return NSOrderedSame;
+                @autoreleasepool {
+                    NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
+                    NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
+                    if (first > second)
+                        return NSOrderedDescending;
+                    if (first < second)
+                        return NSOrderedAscending;
+                    return NSOrderedSame;
+                }
             }
         }
     }];
@@ -1151,6 +1149,8 @@ typedef void (^DownloadCompletionBlock)();
 {
     [self.context performBlock:^{
         @autoreleasepool {
+            savedEntities = [NSMutableDictionary dictionary];
+            
             __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
             
             __block NSError *errorSync = nil;
@@ -1177,26 +1177,33 @@ typedef void (^DownloadCompletionBlock)();
                             
                             [self.context performBlock:^{
                                 if(!error){
-                                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ descargada", nil), [self logClassName:className]] important:NO];
+                                    @autoreleasepool {
+                                        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ descargada", nil), [self logClassName:className]] important:NO];
+                                    
+                                        //Escribimos el resultado en memoria
+                                        [self.JSONRecords setObject:objects forKey:className];
+                                    }
                                 }
                                 else{
-                                    if([error.userInfo objectForKey:@"NSLocalizedDescription"] && [(NSString *)[error.userInfo objectForKey:@"NSLocalizedDescription"] rangeOfString:@"403"].location != NSNotFound){
-                                        errorSync = [self createErrorWithCode:SyncErrorCodeNewVersion
-                                                               andDescription:NSLocalizedString(@"Nueva versión de la aplicación", nil)
-                                                             andFailureReason:NSLocalizedString(@"Hay una nueva versión disponible, debe actualizar la aplicación para continuar utilizandola", nil)
-                                                        andRecoverySuggestion:NSLocalizedString(@"Actualice la aplicación", nil)];
-                                    }
-                                    else if ([error.userInfo objectForKey:@"NSLocalizedDescription"] && [(NSString *)[error.userInfo objectForKey:@"NSLocalizedDescription"] rangeOfString:@"405"].location != NSNotFound){
-                                        errorSync = [self createErrorWithCode:SyncErrorCodeIntegration
-                                                               andDescription:NSLocalizedString(@"Integración en curso", nil)
-                                                             andFailureReason:NSLocalizedString(@"Se está realizando una integración, intentelo de nuevo más tarde.", nil)
-                                                        andRecoverySuggestion:NSLocalizedString(@"Intentelo de nuevo más tarde", nil)];
-                                    }
-                                    else{
-                                        errorSync = [self createErrorWithCode:SyncErrorCodeDownloadInfo
-                                                               andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se han podido descargar los datos de %@", nil), className]
-                                                             andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
-                                                        andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
+                                    @autoreleasepool {
+                                        if([error.userInfo objectForKey:@"NSLocalizedDescription"] && [(NSString *)[error.userInfo objectForKey:@"NSLocalizedDescription"] rangeOfString:@"403"].location != NSNotFound){
+                                            errorSync = [self createErrorWithCode:SyncErrorCodeNewVersion
+                                                                   andDescription:NSLocalizedString(@"Nueva versión de la aplicación", nil)
+                                                                 andFailureReason:NSLocalizedString(@"Hay una nueva versión disponible, debe actualizar la aplicación para continuar utilizandola", nil)
+                                                            andRecoverySuggestion:NSLocalizedString(@"Actualice la aplicación", nil)];
+                                        }
+                                        else if ([error.userInfo objectForKey:@"NSLocalizedDescription"] && [(NSString *)[error.userInfo objectForKey:@"NSLocalizedDescription"] rangeOfString:@"405"].location != NSNotFound){
+                                            errorSync = [self createErrorWithCode:SyncErrorCodeIntegration
+                                                                   andDescription:NSLocalizedString(@"Integración en curso", nil)
+                                                                 andFailureReason:NSLocalizedString(@"Se está realizando una integración, intentelo de nuevo más tarde.", nil)
+                                                            andRecoverySuggestion:NSLocalizedString(@"Intentelo de nuevo más tarde", nil)];
+                                        }
+                                        else{
+                                            errorSync = [self createErrorWithCode:SyncErrorCodeDownloadInfo
+                                                                   andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se han podido descargar los datos de %@", nil), className]
+                                                                 andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
+                                                            andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
+                                        }
                                     }
                                 }
                             }];
@@ -1209,34 +1216,37 @@ typedef void (^DownloadCompletionBlock)();
             
             NSArray *batches = [AFURLConnectionOperation batchOfRequestOperations:requestArray progressBlock:^(NSUInteger numberOfFinishedOperations, NSUInteger totalNumberOfOperations) {} completionBlock:^(NSArray *operations) {
                 [self.context performBlock:^{
-                    
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [api invalidateSessionCancelingTasks:YES];
-                        api = nil;
-                    });
-                    
-                    [self progressBlockIncrementInMainProcess:YES];
-                    
-                    if(!errorSync){
-                        // Do whatever you need to do when all requests are finished
-                        [self messageBlock:NSLocalizedString(@"Descargada toda la información", nil) important:YES];
+                    @autoreleasepool {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [api invalidateSessionCancelingTasks:YES];
+                            api = nil;
+                        });
                         
-                        [self processJSONDataRecordsIntoCoreData:completionBlock];
-                    }
-                    else{
-                        if(self.initialSyncComplete){
-                            [self errorBlock:errorSync fatal:NO];
+                        [self progressBlockIncrementInMainProcess:YES];
+                        
+                        if(!errorSync){
+                            @autoreleasepool {
+                                // Do whatever you need to do when all requests are finished
+                                [self messageBlock:NSLocalizedString(@"Descargada toda la información", nil) important:YES];
                             
-                            if(completionBlock){
-                                completionBlock();
+                                [self processJSONDataRecordsIntoCoreData:completionBlock];
                             }
                         }
                         else{
-                            [self errorBlock:errorSync fatal:YES];
-                            [self executeSyncErrorOperations];
+                            if(self.initialSyncComplete){
+                                [self errorBlock:errorSync fatal:NO];
+                                
+                                if(completionBlock){
+                                    completionBlock();
+                                }
+                            }
+                            else{
+                                [self errorBlock:errorSync fatal:YES];
+                                [self executeSyncErrorOperations];
+                            }
+                            
+                            errorSync = nil;
                         }
-                        
-                        errorSync = nil;
                     }
                 }];
             }];
@@ -1256,69 +1266,24 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)processJSONDataRecordsIntoCoreData:(RecieveObjectsCompletionBlock)completionBlock
 {
-    [self.context performBlockAndWait:^{
+    [self.context performBlock:^{
         @autoreleasepool {
-
             NSMutableDictionary *JSONData = [NSMutableDictionary dictionary];
             
             // Calculamos el progreso
             NSInteger total = 0;
-            NSError *jsonError;
-
             for (NSString *className in self.classesToSync) {
                 @autoreleasepool {
-                    //Leo el JSON
-                    @autoreleasepool {
-                        NSURL *fileURL = [[[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES] URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
-                        NSInputStream *jsonStream = [NSInputStream inputStreamWithURL:fileURL];
-                        if(jsonStream){
-                            [jsonStream open];
-                            
-                            NSDictionary *jsonData = [[[NSJSONSerialization JSONObjectWithStream:jsonStream options:0 error:&jsonError] allObjects] firstObject];
-                            [JSONData setObject:jsonData forKey:className];
-                            jsonData = nil;
-                        }
-                        
-                        //Si se produce un error al parsear el JSON
-                        if(!jsonStream || jsonError){
-                            NSError *errorSync = [self createErrorWithCode:SyncErrorCodeJSON
-                                                            andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido procesar el JSON", nil), [self logClassName:className]]
-                                                          andFailureReason:NSLocalizedString(@"Error al leer o procesar el JSON", nil)
-                                                     andRecoverySuggestion:NSLocalizedString(@"Compruebe el JSON descargado", nil)];
-                            
-                            if(self.initialSyncComplete){
-                                [self errorBlock:errorSync fatal:NO];
-                                
-                                if(completionBlock){
-                                    completionBlock();
-                                }
-                            }
-                            else{
-                                [self errorBlock:errorSync fatal:YES];
-                                [self executeSyncErrorOperations];
-                            }
-                            
-                            errorSync = nil;
-                            return;
-                        }
-                        else{
-                            NSFileManager *fileManager = [NSFileManager defaultManager];
-                            [fileManager removeItemAtURL:fileURL error:NULL];
-                            fileURL = nil;
-                            jsonStream = nil;
-                        }
-                    }
-                    
-                    if ([self initialSyncComplete]){
+                    if (![self initialSyncComplete]){
                         // If this is the initial sync then the logic is pretty simple, you will fetch the JSON data from disk
                         // for the class of the current iteration and create new NSManagedObjects for each record
-                        [JSONData setObject:[self JSONArrayForClassWithName:className withData:JSONData] forKey:className];
+                        [JSONData setObject:[self.JSONRecords objectForKey:className] forKey:className];
                     }
                     else{
                         // Otherwise you need to do some more logic to determine if the record is new or has been updated.
                         // First get the downloaded records from the JSON response, verify there is at least one object in
                         // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
-                        [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className] withData:JSONData] forKey:className];
+                        [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]] forKey:className];
                     }
                     total += [(NSArray *)[JSONData objectForKey:className] count];
                 }
@@ -1335,7 +1300,6 @@ typedef void (^DownloadCompletionBlock)();
                         for (NSDictionary *record in [JSONData objectForKey:className]) {
                             @autoreleasepool {
                                 NSManagedObject *managedObject = [[savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
-                                
                                 if(!managedObject){
                                     [self newManagedObjectWithClassName:className forRecord:record];
                                 }
@@ -1426,19 +1390,21 @@ typedef void (^DownloadCompletionBlock)();
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ guardada", nil), [self logClassName:className]] important:NO];
                 }
             }
-            savedEntities = [NSMutableDictionary dictionary];
+            
+            savedEntities = nil;
+            JSONData = nil;
             
             [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
             [self progressBlockIncrementInMainProcess:YES];
             
-            [self processJSONDataRecordsForDeletion:completionBlock withData:JSONData];
+            [self processJSONDataRecordsForDeletion:completionBlock];
         }
     }];
 }
 
--(void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock withData:(NSMutableDictionary *)data
+-(void)processJSONDataRecordsForDeletion:(RecieveObjectsCompletionBlock)completionBlock
 {
-    [self.context performBlockAndWait:^{
+    [self.context performBlock:^{
         @autoreleasepool {
             // Iterate over all registered classes to sync
             if(self.initialSyncComplete){
@@ -1447,12 +1413,11 @@ typedef void (^DownloadCompletionBlock)();
                 for (NSString *className in self.classesToSync) {
                     @autoreleasepool {
                         // Retrieve the JSON response records from disk
-                        NSArray *JSONRecord = [self JSONDataRecordsForClass:className sortedByKey:@"id" withData:data];
-                        [data removeObjectForKey:className];
+                        NSArray *JSONRecords = [self JSONDataRecordsForClass:className sortedByKey:@"id"];
                         NSArray *storedRecords;
-                        if ([JSONRecord count] > 0) {
+                        if ([JSONRecords count] > 0) {
                             // If there are any records fetch all locally stored records that are NOT in the list of downloaded records
-                            storedRecords = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONRecord valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
+                            storedRecords = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONRecords valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
                         }
                         else{
                             NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
@@ -1481,7 +1446,7 @@ typedef void (^DownloadCompletionBlock)();
                         
                         [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Información de %@ limpiada", nil), [self logClassName:className]] important:NO];
                         
-                        JSONRecord = nil;
+                        JSONRecords = nil;
                         storedRecords = nil;
                     }
                 }
@@ -1489,50 +1454,49 @@ typedef void (^DownloadCompletionBlock)();
                 [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
                 [self progressBlockIncrementInMainProcess:YES];
             }
-        }
-    }];
-    
-    [data removeAllObjects];
-    data = nil;
-    
-    [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
-    
-    [self saveContext:^(BOOL result) {
-        @autoreleasepool {
-            if(result){
-                //Send syncstate remove order
-                if(self.classesToSync.count > 0 && self.initialSyncComplete){
-                    __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
-                    [api pushEntitiesSynchronized:self.startDate onCompletion:^(NSDictionary *object, NSError *error) {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [api invalidateSessionCancelingTasks:YES];
-                            api = nil;
-                        });
-                        
-                        [self.context performBlock:^{
-                            if(!error){
-                                [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
-                            }
-                            else{
-                                NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
-                                                                andDescription:NSLocalizedString(@"No se ha podido limpiar la información de sincronización", nil)
-                                                              andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
-                                                         andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
-                                
-                                [self errorBlock:errorSync fatal:NO];
-                                
-                                errorSync = nil;
-                            }
-                        }];
-                    }];
-                }
-                
-                [self messageBlock:NSLocalizedString(@"Se han guardado los datos", nil) important:YES];
-            }
             
-            if(completionBlock){
-                completionBlock();
-            }
+            self.JSONRecords = nil;
+            
+            [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
+            
+            [self saveContext:^(BOOL result) {
+                @autoreleasepool {
+                    if(result){
+                        //Send syncstate remove order
+                        if(self.classesToSync.count > 0 && self.initialSyncComplete){
+                            __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+                            [api pushEntitiesSynchronized:self.startDate onCompletion:^(NSDictionary *object, NSError *error) {
+                                dispatch_async(dispatch_get_main_queue(), ^{
+                                    [api invalidateSessionCancelingTasks:YES];
+                                    api = nil;
+                                });
+                                
+                                [self.context performBlock:^{
+                                    if(!error){
+                                        [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
+                                    }
+                                    else{
+                                        NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
+                                                                        andDescription:NSLocalizedString(@"No se ha podido limpiar la información de sincronización", nil)
+                                                                      andFailureReason:NSLocalizedString(@"Ha fallado alguno de los servicios web", nil)
+                                                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web y su conexión", nil)];
+                                        
+                                        [self errorBlock:errorSync fatal:NO];
+                                        
+                                        errorSync = nil;
+                                    }
+                                }];
+                            }];
+                        }
+                        
+                        [self messageBlock:NSLocalizedString(@"Se han guardado los datos", nil) important:YES];
+                    }
+                    
+                    if(completionBlock){
+                        completionBlock();
+                    }
+                }
+            }];
         }
     }];
 }
@@ -1996,8 +1960,8 @@ typedef void (^DownloadCompletionBlock)();
             [self checkFilesToDownload];
             
             // Download files
-            if(filesToDownload.count){
-                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Hay %@ ficheros por descargar", nil), [NSNumber numberWithInteger:filesToDownload.count]] important:YES];
+            if(self.filesToDownload.count){
+                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Hay %@ ficheros por descargar", nil), [NSNumber numberWithInteger:self.filesToDownload.count]] important:YES];
                 
                 [self downloadFilesToDownload:completionBlock];
             }
@@ -2017,25 +1981,24 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)cleanEngine
 {
-    [self.context performBlockAndWait:^{
-        @autoreleasepool {
-            [self.context reset];
-            self.context = nil;
-            self.dateFormatter = nil;
-            self.classesToSync = nil;
-            self.downloadQueue = nil;
-            filesToDownload = nil;
-            self.downloadedFiles = 0;
-            self.progressCurrent = 0;
-            self.progressTotal = 0;
-            self.startDate = nil;
-            
-            savedEntities = [NSMutableDictionary dictionary];
-            idPredicateTemplate = nil;
-            syncStatusNotPredicateTemplate = nil;
-            syncStatusPredicateTemplate = nil;
-        }
-    }];
+    @autoreleasepool {
+        [self.context reset];
+        self.context = nil;
+        self.JSONRecords = [NSMutableDictionary dictionary];
+        self.dateFormatter = nil;
+        self.classesToSync = nil;
+        self.downloadQueue = nil;
+        self.filesToDownload = nil;
+        self.downloadedFiles = 0;
+        self.progressCurrent = 0;
+        self.progressTotal = 0;
+        self.startDate = nil;
+        
+        savedEntities = nil;
+        idPredicateTemplate = nil;
+        syncStatusNotPredicateTemplate = nil;
+        syncStatusPredicateTemplate = nil;
+    }
 }
 
 #pragma mark - Downloaded File Management
@@ -2059,7 +2022,7 @@ typedef void (^DownloadCompletionBlock)();
                                 @autoreleasepool {
                                     if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className]){
                                         //Añadimos la url para ser descargada
-                                        [filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
+                                        [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
                                     }
                                 }
                             }
@@ -2084,7 +2047,7 @@ typedef void (^DownloadCompletionBlock)();
     //Thumbnails
     [DMEThumbnailer sharedInstance].sizes = thumbnailSize();
     
-    for (NSDictionary *file in filesToDownload) {
+    for (NSDictionary *file in self.filesToDownload) {
         @autoreleasepool {
             //Eliminamos el valor anterior si no es la primera sincronizacion
             if(self.initialSyncComplete){
@@ -2093,9 +2056,9 @@ typedef void (^DownloadCompletionBlock)();
         }
     }
     
-    [self progressBlockTotal:filesToDownload.count inMainProcess:NO];
+    [self progressBlockTotal:self.filesToDownload.count inMainProcess:NO];
     
-    for (NSDictionary *file in filesToDownload) {
+    for (NSDictionary *file in self.filesToDownload) {
         @autoreleasepool {
             // Add an operation as a block to a queue
             NSFileManager *filemgr = [NSFileManager defaultManager];
@@ -2126,7 +2089,7 @@ typedef void (^DownloadCompletionBlock)();
                 
                 [self progressBlockIncrementInMainProcess:NO];
                 
-                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
+                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
             }];
             [requestArray addObject:op];
         }

@@ -147,13 +147,16 @@
         NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
         NSString *urlLocal = [fileURL path];
         
-        op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
+        //op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
+        op.responseSerializer = [AFJSONResponseSerializer serializer];
         
         [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
         
         [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
             @autoreleasepool {
-                completionBlock([[((NSDictionary *)responseObject) allValues] copy], nil);
+                NSDictionary *response = (NSDictionary *)responseObject;
+                NSArray *data = [response objectForKey:[[response allKeys] firstObject]];
+                completionBlock(data, nil);
                 responseObject = nil;
             }
         } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
