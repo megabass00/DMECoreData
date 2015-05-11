@@ -32,6 +32,7 @@
 #import "NSManagedObject+Files.h"
 #import "NSManagedObject+Serialize.h"
 #import "NSManagedObject+Translation.h"
+#import "NSManagedObject+SyncStates.h"
 #import "NSManagedObject+Unique.h"
 #import "NSPredicate+Fields.h"
 

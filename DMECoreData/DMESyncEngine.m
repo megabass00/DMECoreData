@@ -640,9 +640,6 @@ typedef void (^DownloadCompletionBlock)();
             if(!newRelationManagedObject){
                 newRelationManagedObject = [[self newManagedObjectWithClassName:newClassName forRecord:[NSDictionary dictionaryWithObject:record forKey:newClassName]] objectInContext:self.context];
             }
-            else{
-                newRelationManagedObject = [[self updateManagedObject:newRelationManagedObject withClassName:newClassName withRecord:[NSDictionary dictionaryWithObject:record forKey:newClassName]] objectInContext:self.context];
-            }
             
             //Comprobamos si la relacion es a uno o a varios
             NSEntityDescription *entityDescription = [newRelationManagedObject entity];
@@ -743,22 +740,32 @@ typedef void (^DownloadCompletionBlock)();
                 value = nil;
             }
             
+            id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
+            
             //Según el tipo asignamos el valor
             if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
                 if([value length] == 10){
                     value = [value stringByAppendingString:@" 00:00:00"];
                 }
+                
                 [managedObject setValue:[self dateUsingStringFromAPI:value] forKey:key];
             } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
-                if([value isKindOfClass:[NSString class]]){
-                    [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
-                    
-                }else{
-                    [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                if([currentValue doubleValue] != [value doubleValue]){
+                    if([value isKindOfClass:[NSString class]]){
+                        
+                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                    }
+                    else{
+                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                    }
                 }
             } else {    //Si es una cadena
-                [managedObject setValue:value forKey:key];
+                if(![currentValue isEqualToString:value]){
+                    [managedObject setValue:value forKey:key];
+                }
             }
+            
+            currentValue = nil;
         }
     }
 }
@@ -1074,6 +1081,7 @@ typedef void (^DownloadCompletionBlock)();
                             @autoreleasepool {
                                 NSString *className = [entity valueForKey:@"entity"];
                                 BOOL delete = [[entity valueForKey:@"delete"] boolValue];
+                                BOOL push = [[entity valueForKey:@"push"] boolValue];
                                 
                                 //Añadimos la entidad para sincronizar
                                 if([self.registeredClassesToSync containsObject:className] && ![self.classesToSync containsObject:className]){
@@ -1084,7 +1092,20 @@ typedef void (^DownloadCompletionBlock)();
                                 if(delete){
                                     for (NSManagedObject *object in [self managedObjectsForClass:className withSyncStatus:ObjectSynced]) {
                                         @autoreleasepool {
-                                            [self.context deleteObject:object];
+                                            if([object respondsToSelector:NSSelectorFromString(@"deletable")] && (BOOL)[object performSelector:NSSelectorFromString(@"deletable")] == YES){
+                                                [self.context deleteObject:object];
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                //Si esta marcada para enviar, marcamos como modificadas
+                                if(push){
+                                    for (NSManagedObject *object in [self managedObjectsForClass:className withSyncStatus:ObjectSynced]) {
+                                        @autoreleasepool {
+                                            if([object respondsToSelector:NSSelectorFromString(@"modifiable")] && (BOOL)[object performSelector:NSSelectorFromString(@"modifiable")] == YES){
+                                                [object setValue:[NSNumber numberWithInt:ObjectModified] forKey:@"syncStatus"];
+                                            }
                                         }
                                     }
                                 }
@@ -1299,6 +1320,7 @@ typedef void (^DownloadCompletionBlock)();
                     if (![self initialSyncComplete]) { // import all downloaded data to Core Data for initial sync
                         for (NSDictionary *record in [JSONData objectForKey:className]) {
                             @autoreleasepool {
+                                //Descomentar para que de igual el orden de las entidades
                                 NSManagedObject *managedObject = [[savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
                                 if(!managedObject){
                                     [self newManagedObjectWithClassName:className forRecord:record];
@@ -1543,6 +1565,7 @@ typedef void (^DownloadCompletionBlock)();
                 if(objectsToCreate.count > 0){
                     // Create a dispatch group
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
+                    dispatch_semaphore_t sem;
                     
                     DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
                     
@@ -1557,7 +1580,11 @@ typedef void (^DownloadCompletionBlock)();
                                     // Enter the group for each request we create
                                     dispatch_group_enter(groupGeneral);
                                     
+                                    sem = dispatch_semaphore_create(0);
+                                    
                                     [api pushObjectForClass:className parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
+                                        dispatch_semaphore_signal(sem);
+                                        
                                         [self.context performBlock:^{
                                             if(!error && object){
                                                 if(object.count > 0){
@@ -1632,9 +1659,11 @@ typedef void (^DownloadCompletionBlock)();
                                         }];
                                     }];
                                     
-                                    jsonString = nil;
-                                    filesURL = nil;
+                                    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
                                 }
+                                
+                                jsonString = nil;
+                                filesURL = nil;
                             }
                         }
                     }
@@ -1704,6 +1733,7 @@ typedef void (^DownloadCompletionBlock)();
                 if(objectsToModified.count > 0){
                     // Create a dispatch group
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
+                    dispatch_semaphore_t sem;
                     
                     DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
                     
@@ -1721,8 +1751,12 @@ typedef void (^DownloadCompletionBlock)();
                                         // Enter the group for each request we create
                                         dispatch_group_enter(groupGeneral);
                                         
+                                        sem = dispatch_semaphore_create(0);
+                                        
                                         [api updateObjectForClass:className withId:[objectToModified valueForKey:@"id"] parameters:jsonString files:filesURL onCompletion:^(NSDictionary *object, NSError *error) {
-                                            [self.context performBlockAndWait:^{
+                                            dispatch_semaphore_signal(sem);
+                                            
+                                            [self.context performBlock:^{
                                                 if(!error && object){
                                                     if(object.count > 0){
                                                         for (NSString* key in object) {
@@ -1781,6 +1815,8 @@ typedef void (^DownloadCompletionBlock)();
                                                 }
                                             }];
                                         }];
+                                        
+                                        dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
                                     }
                                     
                                     jsonString = nil;
@@ -1856,6 +1892,7 @@ typedef void (^DownloadCompletionBlock)();
                 if(objectsToDelete.count > 0){
                     // Create a dispatch group
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
+                    dispatch_semaphore_t sem;
                     
                     DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
                     
@@ -1868,8 +1905,12 @@ typedef void (^DownloadCompletionBlock)();
                                     // Enter the group for each request we create
                                     dispatch_group_enter(groupGeneral);
                                     
+                                    sem = dispatch_semaphore_create(0);
+                                    
                                     [api deleteObjectForClass:className withId:[objectToDelete valueForKey:@"id"] onCompletion:^(NSDictionary *object, NSError *error) {
-                                        [self.context performBlockAndWait:^{
+                                        dispatch_semaphore_signal(sem);
+                                        
+                                        [self.context performBlock:^{
                                             if(!error && object){
                                                 if(object.count > 0 && [[object objectForKey:className] valueForKey:@"id"]){
                                                     //Delete object in Core Data
@@ -1907,6 +1948,8 @@ typedef void (^DownloadCompletionBlock)();
                                             }
                                         }];
                                     }];
+                                    
+                                    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
                                 }
                                 
                                 objectId = nil;
