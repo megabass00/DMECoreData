@@ -139,7 +139,7 @@
         }
         components.queryItems = queryItems;
         
-        AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:components.URL]];
+        AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:components.URL cachePolicy:NSURLCacheStorageNotAllowed timeoutInterval:TimeoutInterval]];
         
         op.queuePriority = NSOperationQueuePriorityHigh;
         
