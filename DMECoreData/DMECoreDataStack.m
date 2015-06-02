@@ -124,14 +124,16 @@ static DMECoreDataStack *sharedInstance = nil;
 
 -(NSManagedObjectContext *)backgroundContext
 {
-    //Creamos de nuevo el contexto background
-    NSManagedObjectContext *backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-    backgroundContext.parentContext = [self mainContext];
-    backgroundContext.undoManager = nil;
-    backgroundContext.retainsRegisteredObjects = NO;
-    [backgroundContext setMergePolicy:NSRollbackMergePolicy];
-    
-    return backgroundContext;
+    @autoreleasepool {
+        //Creamos de nuevo el contexto background
+        NSManagedObjectContext *backgroundContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+        backgroundContext.parentContext = [self mainContext];
+        backgroundContext.undoManager = nil;
+        backgroundContext.retainsRegisteredObjects = NO;
+        [backgroundContext setMergePolicy:NSRollbackMergePolicy];
+        
+        return backgroundContext;
+    }
 }
 
 -(NSPersistentStoreCoordinator *)storeCoordinator
@@ -143,7 +145,7 @@ static DMECoreDataStack *sharedInstance = nil;
         
         NSDictionary *options = @{NSMigratePersistentStoresAutomaticallyOption : @YES,
                                   NSInferMappingModelAutomaticallyOption : @YES,
-                                  NSSQLitePragmasOption : @{ @"journal_mode" : @"WAL", @"synchronous": @"NORMAL" }};
+                                  NSSQLitePragmasOption : @{ @"journal_mode" : @"DELETE", @"synchronous": @"NORMAL", @"fullfsync": @"0" }};
         
         
         NSError *err = nil;
