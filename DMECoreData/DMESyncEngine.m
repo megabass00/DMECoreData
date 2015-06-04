@@ -1356,6 +1356,9 @@ typedef void (^DownloadCompletionBlock)();
                                 
                                 NSDictionary *record = [JSONEnumerator nextObject];
                                 NSManagedObject *storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
+                                if([className isEqualToString:@"Client"]){
+                                    NSLog(@"ña");
+                                }
                                 
                                 while (record) {
                                     @autoreleasepool {
@@ -1377,14 +1380,20 @@ typedef void (^DownloadCompletionBlock)();
                                             }
                                             else{
                                                 if([self existsManagedObjectForClass:className withId:id]){
+                                                    if(!storedManagedObject){
+                                                        storedManagedObject = [self managedObjectForClass:className withId:id];
+                                                    }
+                                                    [self updateManagedObject:storedManagedObject withClassName:className withRecord:record];
+                                                    
                                                     storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
                                                 }
                                                 else{
                                                     [self newManagedObjectWithClassName:className forRecord:record];
-                                                    record = [JSONEnumerator nextObject];
-                                                    
-                                                    [self progressBlockIncrementInMainProcess:NO];
                                                 }
+                                                
+                                                record = [JSONEnumerator nextObject];
+                                                
+                                                [self progressBlockIncrementInMainProcess:NO];
                                             }
                                         }
                                         else{

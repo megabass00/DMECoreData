@@ -145,7 +145,7 @@ static DMECoreDataStack *sharedInstance = nil;
         
         NSDictionary *options = @{NSMigratePersistentStoresAutomaticallyOption : @YES,
                                   NSInferMappingModelAutomaticallyOption : @YES,
-                                  NSSQLitePragmasOption : @{ @"journal_mode" : @"DELETE", @"synchronous": @"NORMAL", @"fullfsync": @"0" }};
+                                  NSSQLitePragmasOption : @{ @"journal_mode" : @"DELETE", @"synchronous": @"NORMAL", @"fullfsync": @"0" }}; //Cuidado con tocar, condiciona la escritura en disco
         
         
         NSError *err = nil;
