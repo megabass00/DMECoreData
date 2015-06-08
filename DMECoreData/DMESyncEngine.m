@@ -735,37 +735,44 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         //Si el objeto tiene esa propiedad
         if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isDeleted]){
-            //Si es nulo lo convertimos en nil
-            if([value isKindOfClass:[NSNull class]]){
-                value = nil;
-            }
-            
-            id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
-            
-            //Según el tipo asignamos el valor
-            if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
-                if([value length] == 10){
-                    value = [value stringByAppendingString:@" 00:00:00"];
+            @autoreleasepool {
+                //Si es nulo lo convertimos en nil
+                if([value isKindOfClass:[NSNull class]]){
+                    value = nil;
                 }
                 
-                [managedObject setValue:[self dateUsingStringFromAPI:value] forKey:key];
-            } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
-                if([currentValue doubleValue] != [value doubleValue]){
-                    if([value isKindOfClass:[NSString class]]){
+                id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
+                
+                //Según el tipo asignamos el valor
+                if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
+                    @autoreleasepool {
+                        if([value length] == 10){
+                            value = [value stringByAppendingString:@" 00:00:00"];
+                        }
                         
-                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                        NSDate *dateValue = [self dateUsingStringFromAPI:value];
+                        if(![currentValue isEqualToDate:dateValue]){
+                            [managedObject setValue:dateValue forKey:key];
+                        }
+                        dateValue = nil;
                     }
-                    else{
-                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
+                    if([currentValue doubleValue] != [value doubleValue]){
+                        if([value isKindOfClass:[NSString class]]){
+                            [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                        }
+                        else{
+                            [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                        }
+                    }
+                } else {    //Si es una cadena
+                    if(![currentValue isEqualToString:value]){
+                        [managedObject setValue:value forKey:key];
                     }
                 }
-            } else {    //Si es una cadena
-                if(![currentValue isEqualToString:value]){
-                    [managedObject setValue:value forKey:key];
-                }
+                
+                currentValue = nil;
             }
-            
-            currentValue = nil;
         }
     }
 }
@@ -889,9 +896,9 @@ typedef void (^DownloadCompletionBlock)();
         NSPredicate *predicate;
         //TODO Optimizar a fuego
         if (inIds) {
-            predicate = [NSPredicate predicateWithFormat:@"id IN %@", (NSSet *)idArray];
+            predicate = [NSPredicate predicateWithFormat:@"id IN %@", [NSSet setWithArray:idArray]];
         } else {
-            predicate = [NSPredicate predicateWithFormat:@"NOT (id IN %@)", (NSSet *)idArray];
+            predicate = [NSPredicate predicateWithFormat:@"NOT (id IN %@)", [NSSet setWithArray:idArray]];
         }
         NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
         NSPredicate *syncPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectNotSync]}];
@@ -1006,7 +1013,7 @@ typedef void (^DownloadCompletionBlock)();
             NSMutableArray *filtered = [NSMutableArray array];
             
             NSArray *JSONRecords = [self.JSONRecords objectForKey:className];
-            [JSONRecords enumerateObjectsWithOptions:NSEnumerationConcurrent usingBlock:
+            [JSONRecords enumerateObjectsWithOptions:nil usingBlock:
              ^(id obj, NSUInteger idx, BOOL* stop){
                  if(([[self dateUsingStringFromAPI:obj[className][@"modified"]] compare:aDate] == NSOrderedDescending) || ![actualIds member:obj[className][@"id"]]) {
                      [filtered addObject:obj];
@@ -1356,9 +1363,6 @@ typedef void (^DownloadCompletionBlock)();
                                 
                                 NSDictionary *record = [JSONEnumerator nextObject];
                                 NSManagedObject *storedManagedObject = [[fetchResultsEnumerator nextObject] objectInContext:self.context];
-                                if([className isEqualToString:@"Client"]){
-                                    NSLog(@"ña");
-                                }
                                 
                                 while (record) {
                                     @autoreleasepool {
