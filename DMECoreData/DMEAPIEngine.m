@@ -92,253 +92,233 @@
 
 - (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        if(!parameters){
-            parameters = @{};
-        }
-        NSString *name = [self tableNameForClassName:className];
-        NSString *path = [NSString stringWithFormat:@"%@.json", name];
-        
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        [basicParameters addEntriesFromDictionary:parameters];
-        
-        [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-            completionBlock([((NSDictionary *)responseObject) allValues], nil);
-            responseObject = nil;
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            completionBlock(nil, error);
-        }];
+    if(!parameters){
+        parameters = @{};
     }
+    NSString *name = [self tableNameForClassName:className];
+    NSString *path = [NSString stringWithFormat:@"%@.json", name];
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    [basicParameters addEntriesFromDictionary:parameters];
+    
+    [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
+        completionBlock([((NSDictionary *)responseObject) allValues], nil);
+        responseObject = nil;
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        completionBlock(nil, error);
+    }];
 }
 
 - (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        if(!parameters){
-            parameters = @{};
-        }
-        NSString *name = [self tableNameForClassName:className];
-        NSString *path = [NSString stringWithFormat:@"%@.json", name];
-        
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        [basicParameters addEntriesFromDictionary:parameters];
-        
-        NSURL *url = [self.baseURL URLByAppendingPathComponent:path];
-        NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
-        NSMutableArray *queryItems = [NSMutableArray array];
-        for (NSString *key in basicParameters) {
-            [queryItems addObject:[NSURLQueryItem queryItemWithName:key value:basicParameters[key]]];
-        }
-        components.queryItems = queryItems;
-        
-        AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:components.URL cachePolicy:NSURLCacheStorageNotAllowed timeoutInterval:TimeoutInterval]];
-        
-        op.queuePriority = NSOperationQueuePriorityHigh;
-        
-        NSURL *tmpDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
-        NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
-        NSString *urlLocal = [fileURL path];
-        
-        //op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
-        op.responseSerializer = [AFJSONResponseSerializer serializer];
-        
-        [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
-        
-        [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-            @autoreleasepool {
-                NSDictionary *response = (NSDictionary *)responseObject;
-                NSArray *data = [response objectForKey:[[response allKeys] firstObject]];
-                completionBlock(data, nil);
-                responseObject = nil;
-            }
-        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-            @autoreleasepool {
-                completionBlock(nil, error);
-            }
-        }];
-        
-        return op;
+    if(!parameters){
+        parameters = @{};
     }
+    NSString *name = [self tableNameForClassName:className];
+    NSString *path = [NSString stringWithFormat:@"%@.json", name];
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    [basicParameters addEntriesFromDictionary:parameters];
+    
+    NSURL *url = [self.baseURL URLByAppendingPathComponent:path];
+    NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    NSMutableArray *queryItems = [NSMutableArray array];
+    for (NSString *key in basicParameters) {
+        [queryItems addObject:[NSURLQueryItem queryItemWithName:key value:basicParameters[key]]];
+    }
+    components.queryItems = queryItems;
+    
+    AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:components.URL cachePolicy:NSURLCacheStorageNotAllowed timeoutInterval:TimeoutInterval]];
+    
+    op.queuePriority = NSOperationQueuePriorityHigh;
+    
+    NSURL *tmpDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
+    NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
+    NSString *urlLocal = [fileURL path];
+    
+    //op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
+    op.responseSerializer = [AFJSONResponseSerializer serializer];
+    
+    [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
+    
+    [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSDictionary *response = (NSDictionary *)responseObject;
+        NSArray *data = [response objectForKey:[[response allKeys] firstObject]];
+        completionBlock(data, nil);
+        responseObject = nil;
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        completionBlock(nil, error);
+    }];
+    
+    return op;
 }
 
 - (void)fetchEntitiesForSync:(FetchObjectsCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        NSString *path = @"sync_states.json";
-        
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[@"sync_states", uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        
-        [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-            completionBlock([((NSDictionary *)responseObject) objectForKey:@"sync_states"], nil);
-            responseObject = nil;
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            completionBlock(nil, error);
-        }];
-    }
+    NSString *path = @"sync_states.json";
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[@"sync_states", uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    
+    [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
+        completionBlock([((NSDictionary *)responseObject) objectForKey:@"sync_states"], nil);
+        responseObject = nil;
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        completionBlock(nil, error);
+    }];
 }
 
 - (void)pushEntitiesSynchronized:(NSDate *)startDate onCompletion:(OperationObjectCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        NSString *path = @"sync_states.json";
+    NSString *path = @"sync_states.json";
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[@"sync_states", uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    
+    if(startDate){
+        NSDateFormatter *gmtDateFormatter = [[NSDateFormatter alloc] init];
+        gmtDateFormatter.timeZone = [NSTimeZone timeZoneWithName:@"GMT"];
+        gmtDateFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
         
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[@"sync_states", uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        
-        if(startDate){
-            NSDateFormatter *gmtDateFormatter = [[NSDateFormatter alloc] init];
-            gmtDateFormatter.timeZone = [NSTimeZone timeZoneWithName:@"GMT"];
-            gmtDateFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-            
-            [basicParameters addEntriesFromDictionary:@{@"last_sync_date": [gmtDateFormatter stringFromDate:startDate]}];
-        }
-        
-        [self POST:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-            if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-                completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
-                responseObject = nil;
-            }
-            else{
-                completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error", nil) code:6666 userInfo:@{}]);
-            }
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            completionBlock(nil, error);
-        }];
+        [basicParameters addEntriesFromDictionary:@{@"last_sync_date": [gmtDateFormatter stringFromDate:startDate]}];
     }
+    
+    [self POST:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
+        if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
+        }
+        else{
+            completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error", nil) code:6666 userInfo:@{}]);
+        }
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        completionBlock(nil, error);
+    }];
 }
 
 - (void)pushObjectForClass:(NSString *)className parameters:(NSDictionary *)parameters files:(NSDictionary *)files onCompletion:(OperationObjectCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        NSString *name = [self tableNameForClassName:className];
-        NSString *path = [NSString stringWithFormat:@"%@.json", name];
+    NSString *name = [self tableNameForClassName:className];
+    NSString *path = [NSString stringWithFormat:@"%@.json", name];
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    [basicParameters addEntriesFromDictionary:parameters];
+    
+    [self POST:path parameters:basicParameters constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+        for (NSString* key in files) {
+            NSDictionary *fileFields = [files objectForKey:key];
+            NSData *fileData = [fileFields objectForKey:@"data"];
+            NSString *fileName = [fileFields objectForKey:@"name"];
+            NSString *fileMime = [fileFields objectForKey:@"mime"];
+            NSString *fileKey = [NSString stringWithFormat:@"data[%@][%@]", className, key];
+            [formData appendPartWithFileData:fileData name:fileKey fileName:fileName mimeType:fileMime];
+        }
+    } success:^(NSURLSessionDataTask *task, id responseObject) {
+        if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
+        }
+        else{
+            completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
+        }
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
         
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        [basicParameters addEntriesFromDictionary:parameters];
-        
-        [self POST:path parameters:basicParameters constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
-            for (NSString* key in files) {
-                NSDictionary *fileFields = [files objectForKey:key];
-                NSData *fileData = [fileFields objectForKey:@"data"];
-                NSString *fileName = [fileFields objectForKey:@"name"];
-                NSString *fileMime = [fileFields objectForKey:@"mime"];
-                NSString *fileKey = [NSString stringWithFormat:@"data[%@][%@]", className, key];
-                [formData appendPartWithFileData:fileData name:fileKey fileName:fileName mimeType:fileMime];
-            }
-        } success:^(NSURLSessionDataTask *task, id responseObject) {
-            if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-                completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
-                responseObject = nil;
-            }
-            else{
-                completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
-            }
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            
-            if([error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"]){
-                NSString *html = [[NSString alloc] initWithData:[error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"] encoding:NSUTF8StringEncoding];
-                NSLog(@"HTML: %@", html);
-            }        
-            completionBlock(nil, error);
-        }];
-    }
+        if([error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"]){
+            NSString *html = [[NSString alloc] initWithData:[error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"] encoding:NSUTF8StringEncoding];
+            NSLog(@"HTML: %@", html);
+        }
+        completionBlock(nil, error);
+    }];
 }
 
 - (void)updateObjectForClass:(NSString *)className withId:(NSString *)objectId parameters:(NSDictionary *)parameters files:(NSDictionary *)files onCompletion:(OperationObjectCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        NSString *name = [self tableNameForClassName:className];
-        NSString *path = [NSString stringWithFormat:@"%@/edit/%@.json", name, objectId];
-        
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        [basicParameters addEntriesFromDictionary:parameters];
-        
-        [self POST:path parameters:basicParameters constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
-            for (NSString* key in files) {
-                NSDictionary *fileFields = [files objectForKey:key];
-                NSData *fileData = [fileFields objectForKey:@"data"];
-                NSString *fileName = [fileFields objectForKey:@"name"];
-                NSString *fileMime = [fileFields objectForKey:@"mime"];
-                NSString *fileKey = [NSString stringWithFormat:@"data[%@][%@]", className, key];
-                [formData appendPartWithFileData:fileData name:fileKey fileName:fileName mimeType:fileMime];
-            }
-        } success:^(NSURLSessionDataTask *task, id responseObject) {
-            if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-                completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
-                responseObject = nil;
-            }
-            else{
-                completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
-            }
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            if([error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"]){
-                NSString *html = [[NSString alloc] initWithData:[error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"] encoding:NSUTF8StringEncoding];
-                NSLog(@"HTML: %@", html);
-            }
-            completionBlock(nil, error);
-        }];
-    }
+    NSString *name = [self tableNameForClassName:className];
+    NSString *path = [NSString stringWithFormat:@"%@/edit/%@.json", name, objectId];
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    [basicParameters addEntriesFromDictionary:parameters];
+    
+    [self POST:path parameters:basicParameters constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+        for (NSString* key in files) {
+            NSDictionary *fileFields = [files objectForKey:key];
+            NSData *fileData = [fileFields objectForKey:@"data"];
+            NSString *fileName = [fileFields objectForKey:@"name"];
+            NSString *fileMime = [fileFields objectForKey:@"mime"];
+            NSString *fileKey = [NSString stringWithFormat:@"data[%@][%@]", className, key];
+            [formData appendPartWithFileData:fileData name:fileKey fileName:fileName mimeType:fileMime];
+        }
+    } success:^(NSURLSessionDataTask *task, id responseObject) {
+        if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
+        }
+        else{
+            completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error de validación", nil) code:6666 userInfo:@{}]);
+        }
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        if([error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"]){
+            NSString *html = [[NSString alloc] initWithData:[error.userInfo objectForKey:@"com.alamofire.serialization.response.error.data"] encoding:NSUTF8StringEncoding];
+            NSLog(@"HTML: %@", html);
+        }
+        completionBlock(nil, error);
+    }];
 }
 
 - (void)deleteObjectForClass:(NSString *)className withId:(NSString *)objectId onCompletion:(OperationObjectCompletionBlock)completionBlock
 {
-    @autoreleasepool {
-        NSString *name = [self tableNameForClassName:className];
-        NSString *path = [NSString stringWithFormat:@"%@/delete/%@.json", name, objectId];
-        
-        NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-        NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-        NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-        NSString *ios = [[UIDevice currentDevice] systemVersion];
-        NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-        
-        [self DELETE:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-            if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
-                completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
-                responseObject = nil;
-            }
-            else{
-                completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error al borrar", nil) code:6686 userInfo:@{}]);
-            }
-        } failure:^(NSURLSessionDataTask *task, NSError *error) {
-            completionBlock(nil, error);
-        }];
-    }
+    NSString *name = [self tableNameForClassName:className];
+    NSString *path = [NSString stringWithFormat:@"%@/delete/%@.json", name, objectId];
+    
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
+    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
+    NSString *ios = [[UIDevice currentDevice] systemVersion];
+    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    
+    [self DELETE:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
+        if(![[(NSDictionary *)responseObject objectForKey:@"result"] isKindOfClass:[NSString class]]){
+            completionBlock([(NSDictionary *)responseObject objectForKey:@"result"], nil);
+            responseObject = nil;
+        }
+        else{
+            completionBlock(nil, [NSError errorWithDomain:NSLocalizedString(@"Se ha producido un error al borrar", nil) code:6686 userInfo:@{}]);
+        }
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        completionBlock(nil, error);
+    }];
 }
 
 -(NSString *)tableNameForClassName:(NSString *)className
 {
-    @autoreleasepool {
-        return [[className pluralize] underscore];
-    }
+    return [[className pluralize] underscore];
 }
 
 -(void)dealloc
 {
-
+    NSLog(@"Liberada el API");
 }
 
 @end

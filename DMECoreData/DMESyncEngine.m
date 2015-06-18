@@ -650,10 +650,15 @@ typedef void (^DownloadCompletionBlock)();
                 if([[relationsDictionary objectForKey:relationName] isToMany]){
                     //Comprobamos si la inversa es tambiena  varios
                     if([[[relationsDictionary objectForKey:relationName] inverseRelationship] isToMany]){
-                        SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", newClassName]);
+                        /*SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", newClassName]);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
                         [[managedObject objectInContext:self.context] performSelector:selector withObject:newRelationManagedObject];
+#pragma clang diagnostic pop*/
+                        SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", [className stringByReplacingOccurrencesOfString:@"_" withString:@""]]);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                        [[managedObject objectInContext:self.context] performSelector:selector withObject:[newRelationManagedObject objectInContext:self.context]];
 #pragma clang diagnostic pop
                     }
                     else{
@@ -664,6 +669,9 @@ typedef void (^DownloadCompletionBlock)();
                     }
                 }
                 else{
+                    if([relationName isEqualToString:@"clientOrderDistributor"]){
+                        NSLog(@"dwed");
+                    }
                     [newRelationManagedObject setValue:[managedObject objectInContext:self.context] forKey:relationName];
                 }
                 [self logDebug:@"   Updated relation %@ with id: %@", relationName, [record objectForKey:@"id"]];
@@ -752,7 +760,7 @@ typedef void (^DownloadCompletionBlock)();
                         
                         NSDate *dateValue = [self dateUsingStringFromAPI:value];
                         if(![currentValue isEqualToDate:dateValue]){
-                            [managedObject setValue:dateValue forKey:key];
+                            [managedObject setValue:[dateValue copy] forKey:key];
                         }
                         dateValue = nil;
                     }
@@ -767,7 +775,7 @@ typedef void (^DownloadCompletionBlock)();
                     }
                 } else {    //Si es una cadena
                     if(![currentValue isEqualToString:value]){
-                        [managedObject setValue:value forKey:key];
+                        [managedObject setValue:[value copy] forKey:key];
                     }
                 }
                 
@@ -944,7 +952,6 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)saveContext:(void (^)(BOOL result))success
 {
-    
     [self.context performBlockAndWait:^{
         @autoreleasepool {
             BOOL result = YES;
@@ -1022,7 +1029,9 @@ typedef void (^DownloadCompletionBlock)();
             
             JSONRecords = nil;
             actualIds = nil;
-            returnValue = filtered;
+            returnValue = [NSArray arrayWithArray:filtered];
+            [filtered removeAllObjects];
+            filtered = nil;
         }
         else{
             returnValue = (NSArray *)[self.JSONRecords objectForKey:className];
@@ -1335,7 +1344,7 @@ typedef void (^DownloadCompletionBlock)();
             // Iterate over all registered classes to sync
             for (NSString *className in self.classesToSync) {
                 @autoreleasepool {
-                    if([[JSONData objectForKey:className] count] > 0){
+                    if([JSONData objectForKey:className] && [[JSONData objectForKey:className] count] > 0){
                         [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Guardando información de %@ (%@ objetos)...", nil), [self logClassName:className], [NSNumber numberWithInteger:[[JSONData objectForKey:className] count]]] important:NO];
                         
                         if (![self initialSyncComplete]) { // import all downloaded data to Core Data for initial sync
@@ -1432,11 +1441,14 @@ typedef void (^DownloadCompletionBlock)();
                                 storedManagedObject = nil;
                             }
                         }
+                        
+                        [JSONData removeObjectForKey:className];
                     }
                 }
             }
-            
+            [savedEntities removeAllObjects];
             savedEntities = nil;
+            [JSONData removeAllObjects];
             JSONData = nil;
             
             [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
@@ -1499,7 +1511,7 @@ typedef void (^DownloadCompletionBlock)();
                 [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
                 [self progressBlockIncrementInMainProcess:YES];
             }
-            
+            [self.JSONRecords removeAllObjects];
             self.JSONRecords = nil;
             
             [self messageBlock:NSLocalizedString(@"Guardando los datos...", nil) important:YES];
@@ -2048,6 +2060,11 @@ typedef void (^DownloadCompletionBlock)();
 -(void)cleanEngine
 {
     @autoreleasepool {
+        [self.JSONRecords removeAllObjects];
+        [self.classesToSync removeAllObjects];
+        [self.filesToDownload removeAllObjects];
+        [savedEntities removeAllObjects];
+        
         [self.context reset];
         self.context = nil;
         self.JSONRecords = [NSMutableDictionary dictionary];
@@ -2073,6 +2090,7 @@ typedef void (^DownloadCompletionBlock)();
 -(void)checkFilesToDownload
 {
     NSManagedObjectContext *managedObjectContext = self.context;
+    NSMutableArray *filesToDownloadURLs = [NSMutableArray array];
     
     // Iterate over all registered classes to sync
     for (NSString *className in self.registeredClassesToSync) {
@@ -2086,9 +2104,10 @@ typedef void (^DownloadCompletionBlock)();
                             NSArray *objects = [self managedObjectsForClass:className];
                             for (NSManagedObject *object in objects) {
                                 @autoreleasepool {
-                                    if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className]){
+                                    if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className] && ![filesToDownloadURLs containsObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]]){
                                         //Añadimos la url para ser descargada
                                         [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
+                                        [filesToDownloadURLs addObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]];
                                     }
                                 }
                             }
@@ -2173,7 +2192,7 @@ typedef void (^DownloadCompletionBlock)();
             }
         }];
     }];
-
+    
     if(batches.count > 0){
         [self.downloadQueue addOperations:batches waitUntilFinished:YES];
     }
@@ -2183,7 +2202,6 @@ typedef void (^DownloadCompletionBlock)();
             downloadCompletionAuxBlock = nil;
         }
     }
-    
 }
 
 -(void)thumbnailFileWithName:(NSString *)aName ofClass:(NSString *)aClass
@@ -2315,15 +2333,13 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)messageBlock:(NSString *)message important:(BOOL)important
 {
-    @autoreleasepool {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self logInfo:message];
+    });
+    if(self.messageBlock){
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self logInfo:message];
+            self.messageBlock(message, important);
         });
-        if(self.messageBlock){
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self.messageBlock(message, important);
-            });
-        }
     }
 }
 
@@ -2429,38 +2445,32 @@ typedef void (^DownloadCompletionBlock)();
 
 -(void)logError:(NSString *)aMessage, ...
 {
-    @autoreleasepool {
-        va_list args;
-        va_start(args, aMessage);
-        if(self.logLevel == SyncLogLevelVerbose){
-            NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
-        }
-        va_end(args);
+    va_list args;
+    va_start(args, aMessage);
+    if(self.logLevel == SyncLogLevelVerbose){
+        NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
     }
+    va_end(args);
 }
 
 -(void)logInfo:(NSString *)aMessage, ...
 {
-    @autoreleasepool {
-        va_list args;
-        va_start(args, aMessage);
-        if(self.logLevel == SyncLogLevelVerbose){
-            NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
-        }
-        va_end(args);
+    va_list args;
+    va_start(args, aMessage);
+    if(self.logLevel == SyncLogLevelVerbose){
+        NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
     }
+    va_end(args);
 }
 
 -(void)logDebug:(NSString *)aMessage, ...
 {
-    @autoreleasepool {
-        va_list args;
-        va_start(args, aMessage);
-        if(self.logLevel == SyncLogLevelVerbose){
-            NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
-        }
-        va_end(args);
+    va_list args;
+    va_start(args, aMessage);
+    if(self.logLevel == SyncLogLevelVerbose){
+        NSLog(@"%@", [[NSString alloc] initWithFormat:aMessage arguments:args]);
     }
+    va_end(args);
 }
 
 @end
