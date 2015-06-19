@@ -548,7 +548,7 @@ typedef void (^DownloadCompletionBlock)();
                 }
                 else if([[record objectForKey:key] isKindOfClass:[NSArray class]]){ //Relación con varios objetos
                     
-                    if(self.initialSyncComplete){
+                    if([[record objectForKey:key] count] > 0){
                         //Vaciamos la relacion multiple
                         [self truncateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key];
                         

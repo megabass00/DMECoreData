@@ -111,7 +111,7 @@ static DMECoreDataStack *sharedInstance = nil;
 -(NSManagedObjectContext *)mainContext
 {
     //Creamos un solo contexto para el hilo actual
-    if (_mainContext == nil){
+    if (_mainContext == nil && self.storeCoordinator != nil){
         _mainContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
         //_mainContext.parentContext = [self privateContext];
         _mainContext.persistentStoreCoordinator = self.storeCoordinator;
@@ -158,8 +158,8 @@ static DMECoreDataStack *sharedInstance = nil;
             // Send a notification and return nil
             NSNotification *note = [NSNotification
                                     notificationWithName:[DMECoreDataStack persistentStoreCoordinatorErrorNotificationName]
-                                    object:self
-                                    userInfo:@{@"error" : err}];
+                                    object:err
+                                    userInfo:@{}];
             [[NSNotificationCenter defaultCenter] postNotification:note];
             NSLog(@"Error while adding a Store: %@", err);
             return nil;
