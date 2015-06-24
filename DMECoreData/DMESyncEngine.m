@@ -741,8 +741,10 @@ typedef void (^DownloadCompletionBlock)();
 -(void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject
 {
     @autoreleasepool {
+        NSString *setKey = [@"set" stringByAppendingString:[[[key  substringToIndex:1] uppercaseString] stringByAppendingString:[key substringFromIndex:1]]];
+        
         //Si el objeto tiene esa propiedad
-        if([managedObject respondsToSelector:NSSelectorFromString(key)] && ![managedObject isDeleted]){
+        if([managedObject respondsToSelector:NSSelectorFromString(setKey)] && ![managedObject isDeleted]){
             @autoreleasepool {
                 //Si es nulo lo convertimos en nil
                 if([value isKindOfClass:[NSNull class]]){
