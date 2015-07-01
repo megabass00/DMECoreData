@@ -648,7 +648,7 @@ typedef void (^DownloadCompletionBlock)();
             //Comprobamos si la relacion es a uno o a varios
             if([relationsDictionary objectForKey:relationName]){
                 if([[relationsDictionary objectForKey:relationName] isToMany]){
-                    //Comprobamos si la inversa es tambiena  varios
+                    //Comprobamos si la inversa es tambien a varios
                     if([[[relationsDictionary objectForKey:relationName] inverseRelationship] isToMany]){
                         /*SEL selector = NSSelectorFromString([NSString stringWithFormat:@"add%@Object:", newClassName]);
 #pragma clang diagnostic push
@@ -669,9 +669,6 @@ typedef void (^DownloadCompletionBlock)();
                     }
                 }
                 else{
-                    if([relationName isEqualToString:@"clientOrderDistributor"]){
-                        NSLog(@"dwed");
-                    }
                     [newRelationManagedObject setValue:[managedObject objectInContext:self.context] forKey:relationName];
                 }
                 [self logDebug:@"   Updated relation %@ with id: %@", relationName, [record objectForKey:@"id"]];
@@ -741,49 +738,49 @@ typedef void (^DownloadCompletionBlock)();
 -(void)setValue:(id)value forKey:(NSString *)key forManagedObject:(NSManagedObject *)managedObject
 {
     @autoreleasepool {
-        NSString *setKey = [@"set" stringByAppendingString:[[[key  substringToIndex:1] uppercaseString] stringByAppendingString:[key substringFromIndex:1]]];
+        //Si es nulo lo convertimos en nil
+        if([value isKindOfClass:[NSNull class]]){
+            value = nil;
+        }
         
-        //Si el objeto tiene esa propiedad
-        if([managedObject respondsToSelector:NSSelectorFromString(setKey)] && ![managedObject isDeleted]){
+        id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
+        
+        //Según el tipo asignamos el valor
+        if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
             @autoreleasepool {
-                //Si es nulo lo convertimos en nil
-                if([value isKindOfClass:[NSNull class]]){
-                    value = nil;
+                if([value length] == 10){
+                    value = [value stringByAppendingString:@" 00:00:00"];
                 }
                 
-                id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
-                
-                //Según el tipo asignamos el valor
-                if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
-                    @autoreleasepool {
-                        if([value length] == 10){
-                            value = [value stringByAppendingString:@" 00:00:00"];
-                        }
-                        
-                        NSDate *dateValue = [self dateUsingStringFromAPI:value];
-                        if(![currentValue isEqualToDate:dateValue]){
-                            [managedObject setValue:[dateValue copy] forKey:key];
-                        }
-                        dateValue = nil;
+                NSDate *dateValue = [self dateUsingStringFromAPI:value];
+                if(![currentValue isEqualToDate:dateValue]){
+                    [managedObject setValue:[dateValue copy] forKey:key];
+                }
+                dateValue = nil;
+            }
+        } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
+            if([[[value class] description] isEqualToString:@"__NSCFBoolean"]){
+                if(currentValue != value){
+                    [managedObject setValue:value forKey:key];
+                }
+            }
+            else{
+                if([currentValue doubleValue] != [value doubleValue]){
+                    if([value isKindOfClass:[NSString class]]){
+                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
                     }
-                } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
-                    if([currentValue doubleValue] != [value doubleValue]){
-                        if([value isKindOfClass:[NSString class]]){
-                            [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
-                        }
-                        else{
-                            [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
-                        }
-                    }
-                } else {    //Si es una cadena
-                    if(![currentValue isEqualToString:value]){
-                        [managedObject setValue:[value copy] forKey:key];
+                    else{
+                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
                     }
                 }
-                
-                currentValue = nil;
+            }
+        } else {    //Si es una cadena
+            if(![currentValue isEqualToString:value]){
+                [managedObject setValue:[value copy] forKey:key];
             }
         }
+        
+        currentValue = nil;
     }
 }
 
@@ -1358,8 +1355,8 @@ typedef void (^DownloadCompletionBlock)();
                                     }
                                     else{
                                         [self updateManagedObject:managedObject withClassName:className withRecord:record];
+                                        managedObject = nil;
                                     }
-                                    managedObject = nil;
                                     
                                     [self progressBlockIncrementInMainProcess:NO];
                                 }
