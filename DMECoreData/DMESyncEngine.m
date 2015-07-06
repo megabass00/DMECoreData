@@ -1493,7 +1493,7 @@ typedef void (^DownloadCompletionBlock)();
                             for (NSManagedObject *managedObject in storedRecords) {
                                 @autoreleasepool {
                                     [self logDebug:@"   Deleted %@", className];
-                                    [self.context performBlock:^{
+                                    [self.context performBlockAndWait:^{
                                         [self.context deleteObject:managedObject];
                                     }];
                                 }
@@ -2060,7 +2060,6 @@ typedef void (^DownloadCompletionBlock)();
 {
     @autoreleasepool {
         [self.JSONRecords removeAllObjects];
-        [self.classesToSync removeAllObjects];
         [self.filesToDownload removeAllObjects];
         [savedEntities removeAllObjects];
         
@@ -2068,7 +2067,6 @@ typedef void (^DownloadCompletionBlock)();
         self.context = nil;
         self.JSONRecords = [NSMutableDictionary dictionary];
         self.dateFormatter = nil;
-        self.classesToSync = nil;
         self.downloadQueue = nil;
         self.filesToDownload = nil;
         self.downloadedFiles = 0;
@@ -2096,17 +2094,19 @@ typedef void (^DownloadCompletionBlock)();
         @autoreleasepool {
             if(([self.registeredClassesWithFiles containsObject:className] && self.downloadFiles) || ([self.registeredClassesWithOptionalFiles containsObject:className] && self.downloadOptionalFiles)){
                 NSEntityDescription *classDescription = [NSEntityDescription entityForName:className inManagedObjectContext:managedObjectContext];
-                NSArray *properties = [classDescription properties];
-                for (NSPropertyDescription *property in properties) {
-                    @autoreleasepool {
-                        if([property.name length] > 2 && [[property.name substringToIndex:3] isEqualToString:@"url"]){
-                            NSArray *objects = [self managedObjectsForClass:className];
-                            for (NSManagedObject *object in objects) {
-                                @autoreleasepool {
-                                    if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className] && ![filesToDownloadURLs containsObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]]){
-                                        //Añadimos la url para ser descargada
-                                        [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
-                                        [filesToDownloadURLs addObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]];
+                if(classDescription){
+                    NSArray *properties = [classDescription properties];
+                    for (NSPropertyDescription *property in properties) {
+                        @autoreleasepool {
+                            if([property.name length] > 2 && [[property.name substringToIndex:3] isEqualToString:@"url"]){
+                                NSArray *objects = [self managedObjectsForClass:className];
+                                for (NSManagedObject *object in objects) {
+                                    @autoreleasepool {
+                                        if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className] && ![filesToDownloadURLs containsObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]]){
+                                            //Añadimos la url para ser descargada
+                                            [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
+                                            [filesToDownloadURLs addObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]];
+                                        }
                                     }
                                 }
                             }
@@ -2116,6 +2116,9 @@ typedef void (^DownloadCompletionBlock)();
             }
         }
     }
+    
+    filesToDownloadURLs = nil;
+    managedObjectContext = nil;
 }
 
 //Descarga todos los ficheros de la cola
