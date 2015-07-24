@@ -547,11 +547,10 @@ typedef void (^DownloadCompletionBlock)();
                     [self updateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key withRecord:[record objectForKey:key]];
                 }
                 else if([[record objectForKey:key] isKindOfClass:[NSArray class]]){ //Relación con varios objetos
+                    //Vaciamos la relacion multiple
+                    [self truncateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key];
                     
                     if([[record objectForKey:key] count] > 0){
-                        //Vaciamos la relacion multiple
-                        [self truncateRelation:className ofManagedObject:[managedObject objectInContext:self.context] withClassName:key];
-                        
                         //Volvemos a crearla
                         for(NSDictionary *relationObject in [record objectForKey:key]){
                             @autoreleasepool {
@@ -578,43 +577,50 @@ typedef void (^DownloadCompletionBlock)();
         NSString *relationName = [values objectForKey:@"relationName"];
         NSString *newClassName = [values objectForKey:@"className"];
         
-        //Comprobamos si la relacion es a uno o a varios
-        NSEntityDescription *entityDescription = [[managedObject objectInContext:self.context] entity];
-        NSDictionary *relationsDictionary = [entityDescription relationshipsByName];
-        
-        NSString *inverseRelationName;
-        for(NSRelationshipDescription *relationship in [relationsDictionary allValues]) {
-            if([[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName]){
-                inverseRelationName = [relationship name];
-                break;
-            }
+        if([relation isEqualToString:newClassName]){
+            [managedObject setValue:nil forKey:relationName];
         }
-        
-        //Comprobamos que exista la relación
-        NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
-        if(relationDescription && [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]){
+        else{
+            //Comprobamos si la relacion es a uno o a varios
+            NSEntityDescription *entityDescription = [[managedObject objectInContext:self.context] entity];
+            NSDictionary *relationsDictionary = [entityDescription relationshipsByName];
             
-            //Si son traducciones las eliminamos
-            if(relationDescription.isToMany && [inverseRelationName containsString:@"Translation"]){
-                //Eliminamos los objetos de la relación
-                for (NSManagedObject *relationObject in [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]) {
-                    @autoreleasepool {
-                        [self.context deleteObject:relationObject];
-                    }
+            NSString *inverseRelationName;
+            for(NSRelationshipDescription *relationship in [relationsDictionary allValues]) {
+                if([[[relationship inverseRelationship] name] isEqualToString:relationName] && [[[relationship destinationEntity] name] isEqualToString:newClassName]){
+                    inverseRelationName = [relationship name];
+                    break;
                 }
             }
             
-            //Eliminamos la relacion
-            [managedObject setValue:nil forKey:inverseRelationName];
+            //Comprobamos que exista la relación
+            NSRelationshipDescription *relationDescription = [relationsDictionary objectForKey:inverseRelationName];
+            if(relationDescription && [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]){
+                
+                //Si son traducciones las eliminamos
+                if(relationDescription.isToMany && [inverseRelationName containsString:@"Translation"]){
+                    //Eliminamos los objetos de la relación
+                    for (NSManagedObject *relationObject in [[managedObject objectInContext:self.context] valueForKey:inverseRelationName]) {
+                        @autoreleasepool {
+                            [self.context deleteObject:relationObject];
+                        }
+                    }
+                }
+                
+                //Eliminamos la relacion
+                [managedObject setValue:nil forKey:inverseRelationName];
+            }
+            
+            relationsDictionary = nil;
+            entityDescription = nil;
+            relationDescription = nil;
+            inverseRelationName = nil;
         }
         
         values = nil;
         relationName = nil;
         newClassName = nil;
-        relationsDictionary = nil;
-        entityDescription = nil;
-        relationDescription = nil;
-        inverseRelationName = nil;
+        
     }
 }
 
