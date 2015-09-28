@@ -18,7 +18,8 @@ Pod::Spec.new do |s|
   s.framework = 'CoreData'
   s.dependency 'CocoaLumberjack'
   s.dependency 'AFNetworking', '> 2'
-  s.dependency 'DMEThumbnailer'
+  s.dependency 'DMEThumbnailer',
+  s.dependency 'Inflections',
 
   s.public_header_files = 'DMECoreData/*.h'
 
@@ -26,5 +27,10 @@ Pod::Spec.new do |s|
 
   s.subspec 'Categories' do |ss|
     ss.source_files = 'DMECoreData/Categories/*.{h,m}'
+  end
+
+  s.subspec 'no-arc' do |sp|
+    sp.source_files = 'DMECoreData/Categories/NSString+Inflections.{h,m}'
+    sp.requires_arc = false
   end
 end
