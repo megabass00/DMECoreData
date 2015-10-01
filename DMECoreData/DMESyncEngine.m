@@ -1227,7 +1227,10 @@ typedef void (^DownloadCompletionBlock)();
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargando información de %@...", nil), [self logClassName:className]] important:NO];
                     
                     //Creamos la operacion de descarga
-                    AFHTTPRequestOperation *op = [[DMEAPIEngine sharedInstance] operationFetchObjectsForClass:className withParameters:nil onCompletion:^(NSArray *objects, NSError *error) {
+                    NSMutableDictionary *params;
+                    NSDate *lastUpdateDate = [self lastModifiedDateForClass:className];
+                    
+                    AFHTTPRequestOperation *op = [[DMEAPIEngine sharedInstance] operationFetchObjectsForClass:className updatedAfterDate:lastUpdateDate withParameters:nil onCompletion:^(NSArray *objects, NSError *error) {
                         @autoreleasepool {
                             [self progressBlockIncrementInMainProcess:NO];
                             
@@ -1328,18 +1331,10 @@ typedef void (^DownloadCompletionBlock)();
             NSInteger total = 0;
             for (NSString *className in self.classesToSync) {
                 @autoreleasepool {
-                    if (![self initialSyncComplete]){
-                        // If this is the initial sync then the logic is pretty simple, you will fetch the JSON data from disk
-                        // for the class of the current iteration and create new NSManagedObjects for each record
-                        [JSONData setObject:[self JSONArrayForClassWithName:className] forKey:className];
-                    }
-                    else{
-                        // Otherwise you need to do some more logic to determine if the record is new or has been updated.
-                        // First get the downloaded records from the JSON response, verify there is at least one object in
-                        // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
-                        [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
-                        [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]] forKey:className];
-                    }
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
+                    
+                    [JSONData setObject:[self JSONArrayForClassWithName:className] forKey:className];
+                    
                     total += [(NSArray *)[JSONData objectForKey:className] count];
                 }
             }
@@ -1472,7 +1467,7 @@ typedef void (^DownloadCompletionBlock)();
             if(self.initialSyncComplete){
                 [self progressBlockTotal:self.classesToSync.count inMainProcess:NO];
                 
-                for (NSString *className in self.classesToSync) {
+                /*for (NSString *className in self.classesToSync) {
                     @autoreleasepool {
                         // Retrieve the JSON response records from disk
                         NSArray *JSONRecords = [self JSONDataRecordsForClass:className sortedByKey:@"id"];
@@ -1511,7 +1506,7 @@ typedef void (^DownloadCompletionBlock)();
                         JSONRecords = nil;
                         storedRecords = nil;
                     }
-                }
+                }*/
                 
                 [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
                 [self progressBlockIncrementInMainProcess:YES];

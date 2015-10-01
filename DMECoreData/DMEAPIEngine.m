@@ -90,7 +90,7 @@
 
 #pragma mark - Sincronizacion
 
-- (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
+/*- (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
     if(!parameters){
         parameters = @{};
@@ -111,9 +111,9 @@
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completionBlock(nil, error);
     }];
-}
+}*/
 
-- (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
+- (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className updatedAfterDate:(NSDate *)updatedDate withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
     if(!parameters){
         parameters = @{};
@@ -126,6 +126,13 @@
     NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
     NSString *ios = [[UIDevice currentDevice] systemVersion];
     NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
+    if(updatedDate){
+        NSDateFormatter *gmtDateFormatter = [[NSDateFormatter alloc] init];
+        gmtDateFormatter.timeZone = [NSTimeZone timeZoneWithName:@"GMT"];
+        gmtDateFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        
+        [basicParameters setValue:[gmtDateFormatter stringFromDate:updatedDate] forKey:@"last_modified"];
+    }
     [basicParameters addEntriesFromDictionary:parameters];
     
     NSURL *url = [self.baseURL URLByAppendingPathComponent:path];
