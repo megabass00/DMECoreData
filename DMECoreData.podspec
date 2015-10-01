@@ -18,8 +18,8 @@ Pod::Spec.new do |s|
   s.framework = 'CoreData'
   s.dependency 'CocoaLumberjack'
   s.dependency 'AFNetworking', '> 2'
-  s.dependency 'DMEThumbnailer',
-  s.dependency 'Inflections',
+  s.dependency 'DMEThumbnailer'
+  s.dependency 'Inflections'
 
   s.public_header_files = 'DMECoreData/*.h'
 
