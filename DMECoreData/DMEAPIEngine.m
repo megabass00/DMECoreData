@@ -157,9 +157,7 @@
     [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
     
     [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-        NSDictionary *response = (NSDictionary *)responseObject;
-        NSArray *data = [response objectForKey:[[response allKeys] firstObject]];
-        completionBlock(data, nil);
+        completionBlock(responseObject, nil);
         responseObject = nil;
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
         completionBlock(nil, error);
@@ -168,7 +166,7 @@
     return op;
 }
 
-- (void)fetchEntitiesForSync:(FetchObjectsCompletionBlock)completionBlock
+- (void)fetchEntitiesForSync:(FetchEntitiesCompletionBlock)completionBlock
 {
     NSString *path = @"sync_states.json";
     

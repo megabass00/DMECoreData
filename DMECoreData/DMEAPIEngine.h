@@ -9,7 +9,8 @@
 #import "AFHTTPSessionManager.h"
 #import <AFNetworking.h>
 
-typedef void (^FetchObjectsCompletionBlock)(NSArray *objects, NSError *error);
+typedef void (^FetchEntitiesCompletionBlock)(NSArray *objects, NSError *error);
+typedef void (^FetchObjectsCompletionBlock)(NSDictionary *objects, NSError *error);
 typedef void (^OperationObjectCompletionBlock)(NSDictionary *object, NSError *error);
 typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 
@@ -27,7 +28,7 @@ typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 - (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className updatedAfterDate:(NSDate *)updatedDate withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock;
 
 //Devuelve todas las entidades a sincronizar
-- (void)fetchEntitiesForSync:(FetchObjectsCompletionBlock)completionBlock;
+- (void)fetchEntitiesForSync:(FetchEntitiesCompletionBlock)completionBlock;
 
 //Devuelve todas las entidades a sincronizar
 - (void)pushEntitiesSynchronized:(NSDate *)startDate onCompletion:(OperationObjectCompletionBlock)completionBlock;
