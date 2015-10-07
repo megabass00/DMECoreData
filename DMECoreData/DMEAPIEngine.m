@@ -90,29 +90,6 @@
 
 #pragma mark - Sincronizacion
 
-/*- (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
-{
-    if(!parameters){
-        parameters = @{};
-    }
-    NSString *name = [self tableNameForClassName:className];
-    NSString *path = [NSString stringWithFormat:@"%@.json", name];
-    
-    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-    NSString *ios = [[UIDevice currentDevice] systemVersion];
-    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-    [basicParameters addEntriesFromDictionary:parameters];
-    
-    [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-        completionBlock([((NSDictionary *)responseObject) allValues], nil);
-        responseObject = nil;
-    } failure:^(NSURLSessionDataTask *task, NSError *error) {
-        completionBlock(nil, error);
-    }];
-}*/
-
 - (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className updatedAfterDate:(NSDate *)updatedDate withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
     if(!parameters){
@@ -149,10 +126,9 @@
     
     NSURL *tmpDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
     NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
-    NSString *urlLocal = [fileURL path];
     
-    //op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
-    op.responseSerializer = [AFJSONResponseSerializer serializer];
+    op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
+    //op.responseSerializer = [AFJSONResponseSerializer serializer];
     
     [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
     

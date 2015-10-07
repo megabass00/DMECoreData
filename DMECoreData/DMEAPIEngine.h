@@ -21,10 +21,7 @@ typedef void (^LoginCompletionBlock)(NSDictionary *result, NSError *error);
 - (instancetype)initWithBaseURL:(NSURL *)url sessionConfiguration:(NSURLSessionConfiguration *)configuration;
 - (instancetype)initWithBaseURL:(NSURL *)url;
 
-//Devuelve todos los objetos de una clase
-//- (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock;
-
-//Devuelve una operacion para todos los objetos de una clase
+//Devuelve una operacion para todos los objetos de una clase actualizados o borrados despues de una fecha
 - (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className updatedAfterDate:(NSDate *)updatedDate withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock;
 
 //Devuelve todas las entidades a sincronizar
