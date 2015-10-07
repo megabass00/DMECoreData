@@ -1509,9 +1509,10 @@ typedef void (^DownloadCompletionBlock)();
                         }
                         
                         storedRecords = nil;
-                        self.recordsToDelete = nil;
                     }
                 }
+                
+                self.recordsToDelete = nil;
                 
                 [self messageBlock:NSLocalizedString(@"Se ha finalizado la limpieza de datos", nil) important:YES];
                 [self progressBlockIncrementInMainProcess:YES];
