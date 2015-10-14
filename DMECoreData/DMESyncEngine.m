@@ -23,9 +23,10 @@ typedef void (^DownloadCompletionBlock)();
     NSPredicate *syncStatusPredicateTemplate;
     NSPredicate *syncStatusNotPredicateTemplate;
     DownloadCompletionBlock downloadCompletionAuxBlock;
-    NSMutableDictionary *savedEntities;
     NSTimer *autoSyncTimer;
 }
+
+@property (nonatomic, strong) NSMutableDictionary *savedEntities;
 
 @property (nonatomic, strong) NSManagedObjectContext *context;
 
@@ -33,6 +34,7 @@ typedef void (^DownloadCompletionBlock)();
 @property (nonatomic, strong) __block NSMutableArray *classesToSync;
 @property (nonatomic, strong) __block NSMutableArray *registeredClassesWithFiles;
 @property (nonatomic, strong) __block NSMutableArray *registeredClassesWithOptionalFiles;
+@property (nonatomic, strong) __block NSMutableArray *classesToDownloadAll;
 
 @property (nonatomic, strong) NSDateFormatter *dateFormatter;
 @property (nonatomic, strong) NSMutableDictionary *recordsToDelete;
@@ -394,6 +396,7 @@ typedef void (^DownloadCompletionBlock)();
         
         self.filesToDownload = [NSMutableArray array];
         self.recordsToDelete = [NSMutableDictionary dictionary];
+        self.classesToDownloadAll = [NSMutableArray array];
         self.downloadedFiles = 0;
         self.progressCurrent = 0;
         self.progressTotal = 0;
@@ -513,11 +516,11 @@ typedef void (^DownloadCompletionBlock)();
         }
         
         if(!self.initialSyncComplete){
-            if(![savedEntities objectForKey:className]){
-                [savedEntities setObject:[NSMutableDictionary dictionary] forKey:className];
+            if(![self.savedEntities objectForKey:className]){
+                [self.savedEntities setObject:[NSMutableDictionary dictionary] forKey:className];
             }
             
-            [[savedEntities objectForKey:className] setObject:newManagedObject forKey:[[record objectForKey:className] objectForKey:@"id"]];
+            [[self.savedEntities objectForKey:className] setObject:newManagedObject forKey:[[record objectForKey:className] objectForKey:@"id"]];
         }
         
         [self logDebug:@"   Saved %@ with id: %@", className, [[record objectForKey:className] objectForKey:@"id"]];
@@ -640,7 +643,7 @@ typedef void (^DownloadCompletionBlock)();
                 newRelationManagedObject = [[self managedObjectForClass:newClassName withId:[record objectForKey:@"id"]] objectInContext:self.context];
             }
             else{
-                newRelationManagedObject = [[[savedEntities objectForKey:newClassName] objectForKey:[record objectForKey:@"id"]] objectInContext:self.context];
+                newRelationManagedObject = [[[self.savedEntities objectForKey:newClassName] objectForKey:[record objectForKey:@"id"]] objectInContext:self.context];
             }
             
             if(!newRelationManagedObject){
@@ -887,6 +890,7 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:className];
         [fetchRequest setFetchLimit:1];
+        [fetchRequest setFetchBatchSize:1];
         [fetchRequest setPredicate:[[self idPredicateTemplate] predicateWithSubstitutionVariables:@{@"ID": aId}]];
         
         __block NSManagedObject *object = nil;
@@ -1035,17 +1039,18 @@ typedef void (^DownloadCompletionBlock)();
 }
 
 //Devuelve los valores descargados para una clase modificados a partir de una fecha o que no esten en la base de datos
-/*-(NSArray *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate
+-(NSDictionary *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate
 {
     @autoreleasepool {
-        NSArray *returnValue;
+        NSDictionary *data = [self JSONDataForClassWithName:className];
+        NSDictionary *returnValue;
         
         if(aDate){
             NSSet *actualIds = [NSSet setWithArray:[[self managedObjectsForClass:className] valueForKey:@"id"]];
             
             NSMutableArray *filtered = [NSMutableArray array];
             
-            NSArray *JSONRecords = [self.JSONRecords objectForKey:className];
+            NSArray *JSONRecords = [data objectForKey:@"modified"];
             [JSONRecords enumerateObjectsWithOptions:nil usingBlock:
              ^(id obj, NSUInteger idx, BOOL* stop){
                  if(([[self dateUsingStringFromAPI:obj[className][@"modified"]] compare:aDate] == NSOrderedDescending) || ![actualIds member:obj[className][@"id"]]) {
@@ -1055,58 +1060,60 @@ typedef void (^DownloadCompletionBlock)();
             
             JSONRecords = nil;
             actualIds = nil;
-            returnValue = [NSArray arrayWithArray:filtered];
+            returnValue = @{@"modified": [NSArray arrayWithArray:filtered], @"deleted": [data objectForKey:@"deleted"]};
             [filtered removeAllObjects];
             filtered = nil;
+            
+            return returnValue;
         }
         else{
-            returnValue = (NSArray *)[self.JSONRecords objectForKey:className];
+            return data;
         }
-        
-        return returnValue;
     }
-}*/
+}
 
 //Devuelve los valores descargados para una clase ordenados por un campo
-/*-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key
+-(NSDictionary *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key
 {
     return [self JSONDataRecordsForClass:className sortedByKey:key modifiedAfter:nil];
-}*/
+}
 
 //Devuelve los valores descargados para una clase ordenados por un campo y modificados a partir de una fecha
-/*-(NSArray *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate
+-(NSDictionary *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate
 {
-    NSArray *JSONArray = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
-    NSArray *result = [JSONArray sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
-        @autoreleasepool {
-            if([[[(NSDictionary*)a objectForKey:className] objectForKey:key] isKindOfClass:[NSString class]]){
-                @autoreleasepool {
-                    NSString *first = [[(NSDictionary*)a objectForKey:className] objectForKey:key];
-                    NSString *second = [[(NSDictionary*)b objectForKey:className] objectForKey:key];
-                    
-                    return [first localizedStandardCompare:second];
-                }
+    NSDictionary *data = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
+    NSDictionary *returnValue;
+    
+    NSArray *result = [[data objectForKey:@"modified"] sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
+        if([[[(NSDictionary*)a objectForKey:className] objectForKey:key] isKindOfClass:[NSString class]]){
+            @autoreleasepool {
+                NSString *first = [[(NSDictionary*)a objectForKey:className] objectForKey:key];
+                NSString *second = [[(NSDictionary*)b objectForKey:className] objectForKey:key];
+                
+                return [first localizedStandardCompare:second];
             }
-            else{
-                @autoreleasepool {
-                    NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
-                    NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
-                    if (first > second){
-                        return NSOrderedDescending;
-                    }
-                    if (first < second){
-                        return NSOrderedAscending;
-                    }
-                    return NSOrderedSame;
+        }
+        else{
+            @autoreleasepool {
+                NSInteger first = [[[(NSDictionary*)a objectForKey:className] objectForKey:key] integerValue];
+                NSInteger second = [[[(NSDictionary*)b objectForKey:className] objectForKey:key] integerValue];
+                if (first > second){
+                    return NSOrderedDescending;
                 }
+                if (first < second){
+                    return NSOrderedAscending;
+                }
+                return NSOrderedSame;
             }
         }
     }];
     
-    JSONArray = nil;
+    returnValue = @{@"modified": [NSArray arrayWithArray:result], @"deleted": [data objectForKey:@"deleted"]};
+    result = nil;
+    data = nil;
     
-    return result;
-}*/
+    return returnValue;
+}
 
 #pragma mark - Syncronize Steps
 
@@ -1138,6 +1145,7 @@ typedef void (^DownloadCompletionBlock)();
                                 NSString *className = [entity valueForKey:@"entity"];
                                 BOOL delete = [[entity valueForKey:@"delete"] boolValue];
                                 BOOL push = [[entity valueForKey:@"push"] boolValue];
+                                BOOL all = [[entity valueForKey:@"all"] boolValue];
                                 
                                 //Añadimos la entidad para sincronizar
                                 if([self.registeredClassesToSync containsObject:className] && ![self.classesToSync containsObject:className]){
@@ -1165,6 +1173,13 @@ typedef void (^DownloadCompletionBlock)();
                                         }
                                     }
                                 }
+                                
+                                //Si esta marcada para descargar todo y sincronizarlo lo guardamos
+                                if(all){
+                                    [self.classesToDownloadAll addObject:className];
+                                }
+                                
+                                className = nil;
                                 
                             }
                         }
@@ -1226,13 +1241,10 @@ typedef void (^DownloadCompletionBlock)();
 {
     [self.context performBlock:^{
         @autoreleasepool {
-            savedEntities = [NSMutableDictionary dictionary];
             
             __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
-            
             __block NSError *errorSync = nil;
-            
-            savedEntities = [NSMutableDictionary dictionary];
+            self.savedEntities = [NSMutableDictionary dictionary];
             
             self.downloadQueue = [[NSOperationQueue alloc] init];
             self.downloadQueue.name = @"Download JSON Queue";
@@ -1248,8 +1260,10 @@ typedef void (^DownloadCompletionBlock)();
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargando información de %@...", nil), [self logClassName:className]] important:NO];
                     
                     //Creamos la operacion de descarga
-                    NSMutableDictionary *params;
-                    NSDate *lastUpdateDate = [self lastModifiedDateForClass:className];
+                    NSDate *lastUpdateDate = nil;
+                    if(![self.classesToDownloadAll containsObject:className]){
+                        lastUpdateDate = [self lastModifiedDateForClass:className];
+                    }
                     
                     AFHTTPRequestOperation *op = [[DMEAPIEngine sharedInstance] operationFetchObjectsForClass:className updatedAfterDate:lastUpdateDate withParameters:nil onCompletion:^(NSDictionary *objects, NSError *error) {
                         @autoreleasepool {
@@ -1346,12 +1360,26 @@ typedef void (^DownloadCompletionBlock)();
             @autoreleasepool {
                 
                 //Obtenemos los datos de la clase
-                NSDictionary *JSONData = [self JSONDataForClassWithName:className];
+                NSDictionary *JSONData = nil;
+                if([self.classesToDownloadAll containsObject:className]){
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
+                    JSONData = [self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]];
+                }
+                else{
+                    JSONData = [self JSONDataForClassWithName:className];
+                }
                 
                 //Comprobamos la integridad de los datos
                 if(JSONData && JSONData.count == 2 && [JSONData objectForKey:@"modified"] && [JSONData objectForKey:@"deleted"]){
                     NSArray *JSONDataModified = [JSONData objectForKey:@"modified"];
                     NSArray *JSONDataDeleted = [JSONData objectForKey:@"deleted"];
+                    
+                    //Si se ha marcado para descargar todo y sincronizar, se recojen los ids que estan en el dispositivo pero no llegan en el WS
+                    if([self.classesToDownloadAll containsObject:className]){
+                        NSArray *idsToDelete = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONDataModified valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
+                        
+                        JSONDataDeleted = [[JSONDataDeleted arrayByAddingObjectsFromArray:idsToDelete] valueForKeyPath:@"@distinctUnionOfObjects.self"];
+                    }
                     
                     //Guardamos los objetos borrados para una clase
                     if(JSONDataDeleted && [JSONDataDeleted count] > 0){
@@ -1365,7 +1393,8 @@ typedef void (^DownloadCompletionBlock)();
                         if (![self initialSyncComplete]) { // import all downloaded data to Core Data for initial sync
                             for (NSDictionary *record in JSONDataModified) {
                                 @autoreleasepool {
-                                    NSManagedObject *managedObject = [[savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
+                                    NSManagedObject *managedObject = [[self.savedEntities objectForKey:className] objectForKey:[[record objectForKey:className] objectForKey:@"id"]];
+                                    
                                     if(!managedObject){
                                         [self newManagedObjectWithClassName:className forRecord:record];
                                     }
@@ -1459,7 +1488,7 @@ typedef void (^DownloadCompletionBlock)();
                 }
                 else{
                     NSError *errorSync = [self createErrorWithCode:SyncErrorCodeDownloadInfo
-                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada tiene un formato incorrecto", nil), [self logClassName:className]]
+                                                    andDescription:[NSString stringWithFormat:NSLocalizedString(@"La información descargada de %@ tiene un formato incorrecto", nil), [self logClassName:className]]
                                                   andFailureReason:NSLocalizedString(@"El JSON descargado no tiene un formato correcto", nil)
                                              andRecoverySuggestion:NSLocalizedString(@"Compruebe los servicios web", nil)];
                     
@@ -1483,8 +1512,8 @@ typedef void (^DownloadCompletionBlock)();
                 JSONData = nil;
             }
         }
-        [savedEntities removeAllObjects];
-        savedEntities = nil;
+        [self.savedEntities removeAllObjects];
+        self.savedEntities = nil;
         
         [self messageBlock:NSLocalizedString(@"Toda la información ha sido guardada", nil) important:YES];
         [self progressBlockIncrementInMainProcess:YES];
@@ -1506,19 +1535,9 @@ typedef void (^DownloadCompletionBlock)();
                         // Retrieve the JSON response records from disk
                         NSArray *storedRecords = [NSArray array];
                         NSArray *idsToDelete = [self.recordsToDelete valueForKey:className];
-                        if ([idsToDelete count] > 0) {
+                        if (idsToDelete && [idsToDelete count] > 0) {
                             // If there are any records fetch all locally stored records that are NOT in the list of downloaded records
                             storedRecords = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:idsToDelete inArrayOfIds:YES];
-                        }
-                        else{
-                            NSPredicate *createdPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectCreated]}];
-                            NSPredicate *notSyncPredicate = [[self syncStatusNotPredicateTemplate] predicateWithSubstitutionVariables:@{@"SYNC_STATUS": [NSNumber numberWithInteger:ObjectNotSync]}];
-                            NSPredicate *andPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:[NSArray arrayWithObjects:createdPredicate, notSyncPredicate, nil]];
-                            storedRecords = [self managedObjectsForClass:className withPredicate:andPredicate];
-                            
-                            createdPredicate = nil;
-                            notSyncPredicate = nil;
-                            andPredicate = nil;
                         }
                         
                         if([storedRecords count] > 0){
@@ -1533,8 +1552,6 @@ typedef void (^DownloadCompletionBlock)();
                                     }];
                                 }
                             }
-                            
-                            
                             
                             [self progressBlockIncrementInMainProcess:NO];
                         }
@@ -2097,7 +2114,7 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         [self.recordsToDelete removeAllObjects];
         [self.filesToDownload removeAllObjects];
-        [savedEntities removeAllObjects];
+        [self.savedEntities removeAllObjects];
         
         [self.context reset];
         self.context = nil;
@@ -2109,8 +2126,8 @@ typedef void (^DownloadCompletionBlock)();
         self.progressCurrent = 0;
         self.progressTotal = 0;
         self.startDate = nil;
+        self.savedEntities = nil;
         
-        savedEntities = nil;
         idPredicateTemplate = nil;
         syncStatusNotPredicateTemplate = nil;
         syncStatusPredicateTemplate = nil;
