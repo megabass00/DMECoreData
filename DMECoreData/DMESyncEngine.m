@@ -1041,8 +1041,21 @@ typedef void (^DownloadCompletionBlock)();
 //Devuelve los valores descargados para una clase modificados a partir de una fecha o que no esten en la base de datos
 -(NSDictionary *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate
 {
+    return [self JSONArrayForClassWithName:className modifiedAfter:aDate withData:nil];
+}
+
+//Devuelve los valores descargados para una clase modificados a partir de una fecha o que no esten en la base de datos
+-(NSDictionary *)JSONArrayForClassWithName:(NSString *)className modifiedAfter:(NSDate *)aDate withData:(NSDictionary *)aData
+{
     @autoreleasepool {
-        NSDictionary *data = [self JSONDataForClassWithName:className];
+        NSDictionary *data;
+        if(aData){
+            data = aData;
+        }
+        else{
+            data = [self JSONDataForClassWithName:className];
+        }
+
         NSDictionary *returnValue;
         
         if(aDate){
@@ -1081,7 +1094,20 @@ typedef void (^DownloadCompletionBlock)();
 //Devuelve los valores descargados para una clase ordenados por un campo y modificados a partir de una fecha
 -(NSDictionary *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate
 {
-    NSDictionary *data = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
+    return [self JSONDataRecordsForClass:className sortedByKey:key modifiedAfter:aDate withData:nil];
+}
+
+//Devuelve los valores descargados para una clase ordenados por un campo y modificados a partir de una fecha
+-(NSDictionary *)JSONDataRecordsForClass:(NSString *)className sortedByKey:(NSString *)key modifiedAfter:(NSDate *)aDate withData:(NSDictionary *)aData
+{
+    NSDictionary *data;
+    if(aData){
+        data = [self JSONArrayForClassWithName:className modifiedAfter:aDate withData:aData];
+    }
+    else{
+        data = [self JSONArrayForClassWithName:className modifiedAfter:aDate];
+    }
+    
     NSDictionary *returnValue;
     
     NSArray *result = [[data objectForKey:@"modified"] sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
@@ -1361,9 +1387,14 @@ typedef void (^DownloadCompletionBlock)();
                 
                 //Obtenemos los datos de la clase
                 NSDictionary *JSONData = nil;
+                NSDictionary *JSONAllData = nil;
+                
                 if([self.classesToDownloadAll containsObject:className]){
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
-                    JSONData = [self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]];
+                    JSONAllData = [self JSONDataForClassWithName:className];
+                    if(JSONAllData && JSONAllData.count == 2 && [JSONAllData objectForKey:@"modified"] && [JSONAllData objectForKey:@"deleted"]){
+                        JSONData = [self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className] withData:JSONAllData];
+                    }
                 }
                 else{
                     JSONData = [self JSONDataForClassWithName:className];
@@ -1376,9 +1407,10 @@ typedef void (^DownloadCompletionBlock)();
                     
                     //Si se ha marcado para descargar todo y sincronizar, se recojen los ids que estan en el dispositivo pero no llegan en el WS
                     if([self.classesToDownloadAll containsObject:className]){
-                        NSArray *idsToDelete = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[JSONDataModified valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
+                        NSArray *idsToDelete = [self managedObjectsForClass:className sortedByKey:@"id" usingArrayOfIds:[[[JSONAllData objectForKey:@"modified"] valueForKey:className] valueForKey:@"id"] inArrayOfIds:NO];
                         
-                        JSONDataDeleted = [[JSONDataDeleted arrayByAddingObjectsFromArray:idsToDelete] valueForKeyPath:@"@distinctUnionOfObjects.self"];
+                        JSONDataDeleted = [[JSONDataDeleted arrayByAddingObjectsFromArray:[idsToDelete valueForKey:@"id"]] valueForKeyPath:@"@distinctUnionOfObjects.self"];
+                        JSONAllData = nil;
                     }
                     
                     //Guardamos los objetos borrados para una clase
