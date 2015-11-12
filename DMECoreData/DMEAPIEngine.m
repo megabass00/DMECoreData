@@ -90,7 +90,7 @@
 
 #pragma mark - Sincronizacion
 
-- (void)fetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
+- (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className updatedAfterDate:(NSDate *)updatedDate withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
 {
     if(!parameters){
         parameters = @{};
@@ -103,29 +103,13 @@
     NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
     NSString *ios = [[UIDevice currentDevice] systemVersion];
     NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
-    [basicParameters addEntriesFromDictionary:parameters];
-    
-    [self GET:path parameters:basicParameters success:^(NSURLSessionDataTask *task, id responseObject) {
-        completionBlock([((NSDictionary *)responseObject) allValues], nil);
-        responseObject = nil;
-    } failure:^(NSURLSessionDataTask *task, NSError *error) {
-        completionBlock(nil, error);
-    }];
-}
-
-- (AFHTTPRequestOperation *)operationFetchObjectsForClass:(NSString *)className withParameters:(NSDictionary *)parameters onCompletion:(FetchObjectsCompletionBlock)completionBlock
-{
-    if(!parameters){
-        parameters = @{};
+    if(updatedDate){
+        NSDateFormatter *gmtDateFormatter = [[NSDateFormatter alloc] init];
+        gmtDateFormatter.timeZone = [NSTimeZone timeZoneWithName:@"GMT"];
+        gmtDateFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        
+        [basicParameters setValue:[gmtDateFormatter stringFromDate:updatedDate] forKey:@"last_modified"];
     }
-    NSString *name = [self tableNameForClassName:className];
-    NSString *path = [NSString stringWithFormat:@"%@.json", name];
-    
-    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-    NSString *uuid = [[NSUserDefaults standardUserDefaults] objectForKey:@"uuid"];
-    NSString *hash = [self generateHashWithParameters:@[name, uuid, version]];
-    NSString *ios = [[UIDevice currentDevice] systemVersion];
-    NSMutableDictionary *basicParameters = [NSMutableDictionary dictionaryWithObjectsAndKeys:version, @"version", uuid, @"uuid", hash, @"hash", ios, @"ios", nil];
     [basicParameters addEntriesFromDictionary:parameters];
     
     NSURL *url = [self.baseURL URLByAppendingPathComponent:path];
@@ -142,18 +126,33 @@
     
     NSURL *tmpDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
     NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
-    NSString *urlLocal = [fileURL path];
     
-    //op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
-    op.responseSerializer = [AFJSONResponseSerializer serializer];
+    op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
+    op.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", nil];
     
     [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
     
     [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-        NSDictionary *response = (NSDictionary *)responseObject;
-        NSArray *data = [response objectForKey:[[response allKeys] firstObject]];
-        completionBlock(data, nil);
+        NSError *error;
+        if(![operation.responseSerializer validateResponse:operation.response data:operation.responseData error:&error] || error){
+            NSMutableDictionary *mutableUserInfo = [@{
+                                                      NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedStringFromTable(@"Request failed: unacceptable content-type: %@", @"AFNetworking", nil), [operation.response MIMEType]],
+                                                      NSURLErrorFailingURLErrorKey:[operation.response URL],
+                                                      AFNetworkingOperationFailingURLResponseErrorKey: operation.response,
+                                                      } mutableCopy];
+            if (operation.responseData) {
+                mutableUserInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] = operation.responseData;
+            }
+            
+            error = [NSError errorWithDomain:AFURLResponseSerializationErrorDomain code:NSURLErrorCannotDecodeContentData userInfo:mutableUserInfo];
+            completionBlock(nil, error);
+        }
+        else{
+            completionBlock(responseObject, nil);
+        }
+        
         responseObject = nil;
+        error = nil;
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
         completionBlock(nil, error);
     }];
@@ -161,7 +160,7 @@
     return op;
 }
 
-- (void)fetchEntitiesForSync:(FetchObjectsCompletionBlock)completionBlock
+- (void)fetchEntitiesForSync:(FetchEntitiesCompletionBlock)completionBlock
 {
     NSString *path = @"sync_states.json";
     
