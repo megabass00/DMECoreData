@@ -1210,6 +1210,25 @@ typedef void (^DownloadCompletionBlock)();
                             }
                         }
                         
+                        //Ordenamos las entidades del sync states en el mismo orden que el sincronizador
+                        NSArray *referenceArray = self.registeredClassesToSync;
+                        NSArray *jumbledArray = self.classesToSync;
+                        
+                        NSMutableOrderedSet *setToOrder = [[NSMutableOrderedSet alloc] initWithArray:jumbledArray];
+                        
+                        NSUInteger insertIndex = 0;
+                        
+                        for (NSString *refString in referenceArray) {
+                            NSUInteger presentIndex = [setToOrder indexOfObject:refString]; // one lookup, presumably cheap
+                            
+                            if (presentIndex != NSNotFound) {
+                                [setToOrder moveObjectsAtIndexes:[NSIndexSet indexSetWithIndex:presentIndex] toIndex:insertIndex];
+                                insertIndex++;
+                            }
+                        }
+                        
+                        self.classesToSync = [setToOrder array];
+                        
                         [self messageBlock:NSLocalizedString(@"Información de sincronización descargada", nil) important:YES];
                         
                         [self downloadJSONForRegisteredObjects:completionBlock];
@@ -1364,7 +1383,7 @@ typedef void (^DownloadCompletionBlock)();
             }];
             
             if(batches.count > 0){
-                [self.downloadQueue addOperations:batches waitUntilFinished:YES];
+                [self.downloadQueue addOperations:batches waitUntilFinished:NO];
             }
             else{
                 if(downloadCompletionAuxBlock){
@@ -2250,18 +2269,52 @@ typedef void (^DownloadCompletionBlock)();
             //Creamos la operacion de descarga
             AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:url]];
             op.outputStream = [NSOutputStream outputStreamToFileAtPath:urlLocal append:NO];
+            op.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/pdf", @"application/x-bzpdf", @"application/x-gzpdf", @"image/jpeg", @"image/png", @"image/tiff", @"image/tiff-fx", @"video/mp4", @"video/quicktime", nil];
             op.queuePriority = NSOperationQueuePriorityHigh;
             
             [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
             
-            [op setCompletionBlock:^{
-                [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
-                self.downloadedFiles++;
+            [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
                 
+                self.downloadedFiles++;
                 [self progressBlockIncrementInMainProcess:NO];
                 
-                [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
+                NSError *error;
+                if(![operation.responseSerializer validateResponse:operation.response data:operation.responseData error:&error] || error){
+                    error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
+                                       andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
+                                     andFailureReason:NSLocalizedString(@"Ha fallado la descarga del fichero", nil)
+                                andRecoverySuggestion:NSLocalizedString(@"Compruebe los ficheros", nil)];
+                    
+                    [self errorBlock:error fatal:NO];
+                    
+                    [self removeFileWithName:[file objectForKey:@"url"] ofClass:className];
+                }
+                else{
+                    [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
+                    
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
+                }
+                
+                responseObject = nil;
+                error = nil;
+                
+            } failure:^(AFHTTPRequestOperation * _Nonnull operation, NSError * _Nonnull error) {
+                self.downloadedFiles++;
+                [self progressBlockIncrementInMainProcess:NO];
+
+                error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
+                                   andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
+                                 andFailureReason:NSLocalizedString(@"Ha fallado la descarga del fichero", nil)
+                            andRecoverySuggestion:NSLocalizedString(@"Compruebe los ficheros", nil)];
+                
+                [self errorBlock:error fatal:NO];
+                
+                [self removeFileWithName:[file objectForKey:@"url"] ofClass:className];
+                
+                error = nil;
             }];
+            
             [requestArray addObject:op];
         }
     }
@@ -2280,7 +2333,7 @@ typedef void (^DownloadCompletionBlock)();
     }];
     
     if(batches.count > 0){
-        [self.downloadQueue addOperations:batches waitUntilFinished:YES];
+        [self.downloadQueue addOperations:batches waitUntilFinished:NO];
     }
     else{
         if(downloadCompletionAuxBlock){
@@ -2353,7 +2406,7 @@ typedef void (^DownloadCompletionBlock)();
             resultado = NO;
         }
         else{
-            [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Eliminado fichero: %@", nil), urlLocal] important:NO];
+            [self logDebug:[NSString stringWithFormat:NSLocalizedString(@"Eliminado fichero: %@", nil), urlLocal]];
         }
     }
     else{

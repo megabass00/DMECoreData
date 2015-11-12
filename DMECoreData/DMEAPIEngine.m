@@ -128,13 +128,31 @@
     NSURL *fileURL = [[tmpDirURL URLByAppendingPathComponent:className] URLByAppendingPathExtension:@"json"];
     
     op.outputStream = [NSOutputStream outputStreamWithURL:fileURL append:NO];
-    //op.responseSerializer = [AFJSONResponseSerializer serializer];
+    op.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", nil];
     
     [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
     
     [op setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-        completionBlock(responseObject, nil);
+        NSError *error;
+        if(![operation.responseSerializer validateResponse:operation.response data:operation.responseData error:&error] || error){
+            NSMutableDictionary *mutableUserInfo = [@{
+                                                      NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedStringFromTable(@"Request failed: unacceptable content-type: %@", @"AFNetworking", nil), [operation.response MIMEType]],
+                                                      NSURLErrorFailingURLErrorKey:[operation.response URL],
+                                                      AFNetworkingOperationFailingURLResponseErrorKey: operation.response,
+                                                      } mutableCopy];
+            if (operation.responseData) {
+                mutableUserInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] = operation.responseData;
+            }
+            
+            error = [NSError errorWithDomain:AFURLResponseSerializationErrorDomain code:NSURLErrorCannotDecodeContentData userInfo:mutableUserInfo];
+            completionBlock(nil, error);
+        }
+        else{
+            completionBlock(responseObject, nil);
+        }
+        
         responseObject = nil;
+        error = nil;
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
         completionBlock(nil, error);
     }];
