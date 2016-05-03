@@ -1,13 +1,13 @@
 Pod::Spec.new do |s|
   s.name     = 'DMECoreData'
-  s.version  = '0.3.9'
+  s.version  = '0.3.10'
   s.license  = 'BSD'
   s.summary  = 'DMECoreData is a package of utilities about Core Data'
   s.homepage = 'https://github.com/damarte/DMECoreData'
   s.author   = { 'David Martínez' => 'damarte86@gmail.com' }
   s.source   = {
     :git => 'https://github.com/damarte/DMECoreData.git',
-    :tag => '0.3.9'
+    :tag => '0.3.10'
   }
   s.requires_arc = true
   s.platform = :ios, '8.0'
