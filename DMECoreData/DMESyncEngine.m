@@ -774,17 +774,12 @@ typedef void (^DownloadCompletionBlock)();
                 }
             }
             else{
-                if([currentValue doubleValue] != [value doubleValue]){
-                    if([value isKindOfClass:[NSString class]]){
-                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
-                    }
-                    else{
-                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
-                    }
+                if(currentValue == nil || ([currentValue doubleValue] != [value doubleValue])){
+                    [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
                 }
             }
         } else {    //Si es una cadena
-            if(![currentValue isEqualToString:value]){
+            if(currentValue == nil || ![currentValue isEqualToString:value]){
                 [managedObject setValue:[value copy] forKey:key];
             }
         }
