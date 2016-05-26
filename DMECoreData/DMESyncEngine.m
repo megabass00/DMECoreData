@@ -14,6 +14,8 @@ NSString * const SyncEngineSyncCompletedNotificationName = @"SyncEngineSyncCompl
 NSString * const SyncEngineSyncErrorNotificationName = @"SyncEngineSyncError";
 NSString * const SyncEngineErrorDomain = @"SyncEngineErrorDomain";
 
+NSString * const SyncEngineLastSyncKey = @"DMESyncEngineLastSync";
+
 typedef void (^RecieveObjectsCompletionBlock)();
 typedef void (^SendObjectsCompletionBlock)();
 typedef void (^DownloadCompletionBlock)();
@@ -273,6 +275,10 @@ typedef void (^DownloadCompletionBlock)();
                     self.classesToSync = self.registeredClassesToSync;
                     [[NSThread currentThread] setName:@"Install"];
                     [self downloadJSONForRegisteredObjects:^{
+                        NSDate *syncStartDate = self.startDate;
+                        [[NSUserDefaults standardUserDefaults] setObject:syncStartDate forKey:SyncEngineLastSyncKey];
+                        [[NSUserDefaults standardUserDefaults] synchronize];
+                        
                         [self executeSyncCompletedOperations];
                     }];
                 }
@@ -1302,7 +1308,7 @@ typedef void (^DownloadCompletionBlock)();
                     //Creamos la operacion de descarga
                     NSDate *lastUpdateDate = nil;
                     if(![self.classesToDownloadAll containsObject:className]){
-                        lastUpdateDate = [self lastModifiedDateForClass:className];
+                        lastUpdateDate = [[NSUserDefaults standardUserDefaults] objectForKey:SyncEngineLastSyncKey] ?: [self lastModifiedDateForClass:className];
                     }
                     
                     AFHTTPRequestOperation *op = [[DMEAPIEngine sharedInstance] operationFetchObjectsForClass:className updatedAfterDate:lastUpdateDate withParameters:nil onCompletion:^(NSDictionary *objects, NSError *error) {
@@ -1407,7 +1413,10 @@ typedef void (^DownloadCompletionBlock)();
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
                     JSONAllData = [self JSONDataForClassWithName:className];
                     if(JSONAllData && JSONAllData.count == 2 && [JSONAllData objectForKey:@"modified"] && [JSONAllData objectForKey:@"deleted"]){
-                        JSONData = [self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className] withData:JSONAllData];
+                        
+                        NSDate *lastSyncDate = [[NSUserDefaults standardUserDefaults] objectForKey:SyncEngineLastSyncKey] ?: [self lastModifiedDateForClass:className];
+                        
+                        JSONData = [self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:lastSyncDate withData:JSONAllData];
                     }
                 }
                 else{
@@ -1628,6 +1637,10 @@ typedef void (^DownloadCompletionBlock)();
                                 [self.context performBlock:^{
                                     if(!error){
                                         [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
+                                        
+                                        NSDate *syncStartDate = self.startDate;
+                                        [[NSUserDefaults standardUserDefaults] setObject:syncStartDate forKey:SyncEngineLastSyncKey];
+                                        [[NSUserDefaults standardUserDefaults] synchronize];
                                     }
                                     else{
                                         NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
