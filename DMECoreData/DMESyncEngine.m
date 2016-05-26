@@ -1357,7 +1357,7 @@ typedef void (^DownloadCompletionBlock)();
                         // Otherwise you need to do some more logic to determine if the record is new or has been updated.
                         // First get the downloaded records from the JSON response, verify there is at least one object in
                         // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
-                        NSDate *lastSyncDate = [[NSUserDefaults standardUserDefaults] objectForKey:SyncEngineLastSyncKey] ?: self.startDate;
+                        NSDate *lastSyncDate = [[NSUserDefaults standardUserDefaults] objectForKey:SyncEngineLastSyncKey] ?: [self lastModifiedDateForClass:className];
                         
                         [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
                         [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:lastSyncDate] forKey:className];
