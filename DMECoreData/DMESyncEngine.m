@@ -14,6 +14,8 @@ NSString * const SyncEngineSyncCompletedNotificationName = @"SyncEngineSyncCompl
 NSString * const SyncEngineSyncErrorNotificationName = @"SyncEngineSyncError";
 NSString * const SyncEngineErrorDomain = @"SyncEngineErrorDomain";
 
+NSString * const SyncEngineLastSyncKey = @"DMESyncEngineLastSync";
+
 typedef void (^RecieveObjectsCompletionBlock)();
 typedef void (^SendObjectsCompletionBlock)();
 typedef void (^DownloadCompletionBlock)();
@@ -271,6 +273,10 @@ typedef void (^DownloadCompletionBlock)();
                     self.classesToSync = self.registeredClassesToSync;
                     [[NSThread currentThread] setName:@"Install"];
                     [self downloadJSONForRegisteredObjects:^{
+                        NSDate *syncStartDate = self.startDate;
+                        [[NSUserDefaults standardUserDefaults] setObject:syncStartDate forKey:SyncEngineLastSyncKey];
+                        [[NSUserDefaults standardUserDefaults] synchronize];
+                        
                         [self executeSyncCompletedOperations];
                     }];
                 }
@@ -1351,8 +1357,10 @@ typedef void (^DownloadCompletionBlock)();
                         // Otherwise you need to do some more logic to determine if the record is new or has been updated.
                         // First get the downloaded records from the JSON response, verify there is at least one object in
                         // the data, and then fetch all records stored in Core Data whose objectId matches those from the JSON response.
+                        NSDate *lastSyncDate = [[NSUserDefaults standardUserDefaults] objectForKey:SyncEngineLastSyncKey] ?: self.startDate;
+                        
                         [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Procesando información de %@...", nil), [self logClassName:className]] important:NO];
-                        [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:[self lastModifiedDateForClass:className]] forKey:className];
+                        [JSONData setObject:[self JSONDataRecordsForClass:className sortedByKey:@"id" modifiedAfter:lastSyncDate] forKey:className];
                     }
                     total += [(NSArray *)[JSONData objectForKey:className] count];
                 }
@@ -1550,6 +1558,10 @@ typedef void (^DownloadCompletionBlock)();
                                 [self.context performBlock:^{
                                     if(!error){
                                         [self messageBlock:NSLocalizedString(@"Se ha limpiado la información de sincronización", nil) important:YES];
+                                        
+                                        NSDate *syncStartDate = self.startDate;
+                                        [[NSUserDefaults standardUserDefaults] setObject:syncStartDate forKey:SyncEngineLastSyncKey];
+                                        [[NSUserDefaults standardUserDefaults] synchronize];
                                     }
                                     else{
                                         NSError *errorSync = [self createErrorWithCode:SyncErrorCodeCleanSyncInfo
