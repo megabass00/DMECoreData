@@ -752,42 +752,43 @@ typedef void (^DownloadCompletionBlock)();
     @autoreleasepool {
         //Si es nulo lo convertimos en nil
         if([value isKindOfClass:[NSNull class]]){
-            value = nil;
+            [managedObject setValue:nil forKey:key];
         }
-        
-        id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
-        
-        //Según el tipo asignamos el valor
-        if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
-            @autoreleasepool {
-                if([value length] == 10){
-                    value = [value stringByAppendingString:@" 00:00:00"];
+        else{
+            id currentValue = [managedObject performSelector:NSSelectorFromString(key)];
+            
+            //Según el tipo asignamos el valor
+            if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSDate"]) {    //Si es una fecha
+                @autoreleasepool {
+                    if([value length] == 10){
+                        value = [value stringByAppendingString:@" 00:00:00"];
+                    }
+                    
+                    NSDate *dateValue = [self dateUsingStringFromAPI:value];
+                    if(![currentValue isEqualToDate:dateValue]){
+                        [managedObject setValue:[dateValue copy] forKey:key];
+                    }
+                    dateValue = nil;
                 }
-                
-                NSDate *dateValue = [self dateUsingStringFromAPI:value];
-                if(![currentValue isEqualToDate:dateValue]){
-                    [managedObject setValue:[dateValue copy] forKey:key];
+            } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
+                if([[[value class] description] isEqualToString:@"__NSCFBoolean"]){
+                    if(currentValue != value){
+                        [managedObject setValue:value forKey:key];
+                    }
                 }
-                dateValue = nil;
-            }
-        } else if ([[[managedObject.entity.propertiesByName objectForKey:key] attributeValueClassName] isEqualToString:@"NSNumber"]) {    //Si es un numero
-            if([[[value class] description] isEqualToString:@"__NSCFBoolean"]){
-                if(currentValue != value){
-                    [managedObject setValue:value forKey:key];
+                else{
+                    if([currentValue doubleValue] != [value doubleValue]){
+                        [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+                    }
                 }
-            }
-            else{
-                if(currentValue == nil || ([currentValue doubleValue] != [value doubleValue])){
-                    [managedObject setValue:[NSNumber numberWithDouble:[value doubleValue]] forKey:key];
+            } else {    //Si es una cadena
+                if(![currentValue isEqualToString:value]){
+                    [managedObject setValue:[value copy] forKey:key];
                 }
             }
-        } else {    //Si es una cadena
-            if(currentValue == nil || ![currentValue isEqualToString:value]){
-                [managedObject setValue:[value copy] forKey:key];
-            }
+            
+            currentValue = nil;
         }
-        
-        currentValue = nil;
     }
 }
 
