@@ -272,6 +272,9 @@ typedef void (^DownloadCompletionBlock)();
                 }
                 else{
                     //Si es la instalacion
+                    [[NSUserDefaults standardUserDefaults] removeObjectForKey:SyncEngineLastSyncKey];
+                    [[NSUserDefaults standardUserDefaults] synchronize];
+                    
                     self.classesToSync = self.registeredClassesToSync;
                     [[NSThread currentThread] setName:@"Install"];
                     [self downloadJSONForRegisteredObjects:^{
