@@ -209,19 +209,20 @@ static DMECoreDataStack *sharedInstance = nil;
 
 -(void)zapAllData
 {
+    [self.mainContext reset];
+    [self.backgroundContext reset];
+    
     NSError *err = nil;
     for (NSPersistentStore *store in self.storeCoordinator.persistentStores) {
         
-        if(![self.storeCoordinator removePersistentStore:store
-                                                   error:&err]){
+        if(![self.storeCoordinator removePersistentStore:store error:&err] || err){
             NSLog(@"Error while removing store %@ from store coordinator %@", store, self.storeCoordinator);
         }
     }
-    if (![[NSFileManager defaultManager] removeItemAtURL:self.dbURL
-                                                   error:&err]) {
+    
+    if (![[NSFileManager defaultManager] removeItemAtURL:self.dbURL error:&err] || err) {
         NSLog(@"Error removing %@: %@", self.dbURL, err);
     }
-    
     
     // The Core Data stack does not like you removing the file under it. If you want to delete the file
     // you should tear down the stack, delete the file and then reconstruct the stack.
