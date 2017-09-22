@@ -40,8 +40,7 @@ typedef NS_ENUM(NSUInteger, SyncErrorCode) {
     SyncErrorCodeOpenFile = 15,
     SyncErrorCodeURLContainIllegalCharacters = 16,
     SyncErrorCodeCleanCache = 17,
-    SyncErrorCodeCleanThumbsCache = 18,
-    SyncErrorCodeJSON = 19,
+    SyncErrorCodeJSON = 18,
 };
 
 typedef void (^SyncStartBlock)();

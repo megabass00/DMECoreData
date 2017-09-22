@@ -1157,13 +1157,13 @@ typedef void (^DownloadCompletionBlock)();
         @autoreleasepool {
             [self messageBlock:NSLocalizedString(@"Descargando información de sincronización...", nil) important:YES];
             
-            __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+            __block DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
             
             [api fetchEntitiesForSync:^(NSArray *objects, NSError *error) {
-                dispatch_async(dispatch_get_main_queue(), ^{
+                /*dispatch_async(dispatch_get_main_queue(), ^{
                     [api invalidateSessionCancelingTasks:YES];
                     api = nil;
-                });
+                });*/
                 
                 [self progressBlockIncrementInMainProcess:YES];
                 
@@ -1292,7 +1292,7 @@ typedef void (^DownloadCompletionBlock)();
     [self.context performBlock:^{
         @autoreleasepool {
             
-            __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+            __block DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
             __block NSError *errorSync = nil;
             self.savedEntities = [NSMutableDictionary dictionary];
             
@@ -1353,10 +1353,10 @@ typedef void (^DownloadCompletionBlock)();
             NSArray *batches = [AFURLConnectionOperation batchOfRequestOperations:requestArray progressBlock:^(NSUInteger numberOfFinishedOperations, NSUInteger totalNumberOfOperations) {} completionBlock:^(NSArray *operations) {
                 [self.context performBlock:^{
                     @autoreleasepool {
-                        dispatch_async(dispatch_get_main_queue(), ^{
+                        /*dispatch_async(dispatch_get_main_queue(), ^{
                             [api invalidateSessionCancelingTasks:YES];
                             api = nil;
-                        });
+                        });*/
                         
                         [self progressBlockIncrementInMainProcess:YES];
                         
@@ -1631,12 +1631,12 @@ typedef void (^DownloadCompletionBlock)();
                     if(result){
                         //Send syncstate remove order
                         if(self.classesToSync.count > 0 && self.initialSyncComplete){
-                            __block DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+                            __block DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
                             [api pushEntitiesSynchronized:self.startDate onCompletion:^(NSDictionary *object, NSError *error) {
-                                dispatch_async(dispatch_get_main_queue(), ^{
+                                /*dispatch_async(dispatch_get_main_queue(), ^{
                                     [api invalidateSessionCancelingTasks:YES];
                                     api = nil;
-                                });
+                                });*/
                                 
                                 [self.context performBlock:^{
                                     if(!error){
@@ -1716,7 +1716,7 @@ typedef void (^DownloadCompletionBlock)();
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
                     dispatch_semaphore_t sem;
                     
-                    DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+                    DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
                     
                     for (NSManagedObject *objectToCreate in objectsToCreate) {
                         @autoreleasepool {
@@ -1884,7 +1884,7 @@ typedef void (^DownloadCompletionBlock)();
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
                     dispatch_semaphore_t sem;
                     
-                    DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+                    DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
                     
                     for (NSManagedObject *objectToModified in objectsToModified) {
                         @autoreleasepool {
@@ -2043,7 +2043,7 @@ typedef void (^DownloadCompletionBlock)();
                     __block dispatch_group_t groupGeneral = dispatch_group_create();
                     dispatch_semaphore_t sem;
                     
-                    DMEAPIEngine *api = [[DMEAPIEngine alloc] init];
+                    DMEAPIEngine *api = [DMEAPIEngine sharedInstance];
                     
                     for (NSManagedObject *objectToDelete in objectsToDelete) {
                         @autoreleasepool {
@@ -2246,9 +2246,6 @@ typedef void (^DownloadCompletionBlock)();
     NSMutableArray *requestArray = [NSMutableArray array];
     downloadCompletionAuxBlock = completionBlock;
     
-    //Thumbnails
-    [DMEThumbnailer sharedInstance].sizes = thumbnailSize();
-    
     for (NSDictionary *file in self.filesToDownload) {
         @autoreleasepool {
             //Eliminamos el valor anterior si no es la primera sincronizacion
@@ -2303,8 +2300,6 @@ typedef void (^DownloadCompletionBlock)();
                     [self removeFileWithName:[file objectForKey:@"url"] ofClass:className];
                 }
                 else{
-                    [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
-                    
                     [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
                 }
                 
@@ -2353,44 +2348,6 @@ typedef void (^DownloadCompletionBlock)();
             downloadCompletionAuxBlock = nil;
         }
     }
-}
-
--(void)thumbnailFileWithName:(NSString *)aName ofClass:(NSString *)aClass
-{
-    NSString *className = [NSString stringWithFormat:@"%@%@", [[aClass substringToIndex:1] lowercaseString], [aClass substringFromIndex:1]];
-    NSString *urlDirectorio = [NSString stringWithFormat:@"%@/%@", pathCache(), className];
-    NSString *urlLocal = [NSString stringWithFormat:@"%@/%@", urlDirectorio, aName];
-    
-    NSString *file = urlLocal;
-    CFStringRef fileExtension = (__bridge CFStringRef) [file pathExtension];
-    CFStringRef fileUTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, fileExtension, NULL);
-    
-    if (UTTypeConformsTo(fileUTI, kUTTypeImage)){
-        [[DMEThumbnailer sharedInstance] generateImageThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
-    }
-    else if (UTTypeConformsTo(fileUTI, kUTTypeMovie)){
-        [[DMEThumbnailer sharedInstance] generateVideoThumbnails:urlLocal afterGenerate:^(UIImage **thumb) {
-            //Overlay play
-            UIImage *backgroundImage = *thumb;
-            UIImage *watermarkImage = [UIImage imageNamed:@"VideoWatermark"];
-            CGSize watermarkSize = watermarkImage.size;
-            watermarkSize = [[DMEThumbnailer sharedInstance] adjustSizeRetina:watermarkSize];
-            UIGraphicsBeginImageContext(backgroundImage.size);
-            [backgroundImage drawInRect:CGRectMake(0, 0, backgroundImage.size.width, backgroundImage.size.height)];
-            [watermarkImage drawInRect:CGRectMake((backgroundImage.size.width - watermarkSize.width) / 2, (backgroundImage.size.height - watermarkSize.height) / 2, watermarkSize.width, watermarkSize.height)];
-            *thumb = UIGraphicsGetImageFromCurrentImageContext();
-            UIGraphicsEndImageContext();
-        } completionBlock:nil];
-    }
-    else if (UTTypeConformsTo(fileUTI, kUTTypePDF)){
-        [[DMEThumbnailer sharedInstance] generatePDFThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
-    }
-    
-    CFRelease(fileUTI);
-    file = nil;
-    urlLocal = nil;
-    urlDirectorio = nil;
-    className = nil;
 }
 
 //Comprueba si un fichero existe
@@ -2460,24 +2417,6 @@ typedef void (^DownloadCompletionBlock)();
     }
     
     [self messageBlock:NSLocalizedString(@"Se ha terminado de limpiar la cache", nil) important:YES];
-    
-    [self messageBlock:NSLocalizedString(@"Limpiando cache de miniaturas", nil) important:YES];
-    
-    //Borramos los thumbs
-    NSString *urlLocal = [NSString stringWithFormat:@"%@/Thumbs", pathCache()];
-    if ([filemgr fileExistsAtPath:urlLocal isDirectory:&isDir] && [filemgr isDeletableFileAtPath: urlLocal]) {
-        [filemgr removeItemAtPath: urlLocal error:&error];
-        if(error){
-            NSError *error = [self createErrorWithCode:SyncErrorCodeCleanThumbsCache
-                                        andDescription:NSLocalizedString(@"No se ha podido limpiar la cache de miniaturas", nil)
-                                      andFailureReason:NSLocalizedString(@"Ocurrio un error al eliminar ficheros de la cache", nil)
-                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe el sistema de ficheros", nil)];
-            [self errorBlock:error fatal:NO];
-        }
-        else{
-            [self messageBlock:NSLocalizedString(@"Se ha terminado de limpiar la cache de miniaturas", nil) important:YES];
-        }
-    }
 }
 
 #pragma mark - Block Utils

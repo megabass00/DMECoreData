@@ -37,7 +37,6 @@
 #import "NSPredicate+Fields.h"
 
 #import "DMEAPIEngine.h"
-#import "DMEThumbnailer.h"
 #import "DMESyncEngine.h"
 
 extern NSInteger const TimeoutInterval;             //Timeout de las peticiones al API
@@ -49,7 +48,6 @@ extern NSString *const SecuritySalt;                //Salt de seguridad
 extern NSInteger const ddLogLevel;                  //Nivel de log
 extern NSString *const URLAPI;                      //URL del API
 extern BOOL const ValidateUniqueId;                 //Indica si se validan los ids como unicos
-extern NSDictionary* thumbnailSize();               //Tamaños de thumbnails
 extern NSString* pathCache();                       //Directorio de cache
 
 #endif

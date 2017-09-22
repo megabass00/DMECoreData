@@ -30,8 +30,6 @@
             return NO;
         }
         else{
-            [[DMEThumbnailer sharedInstance] removeThumbnails:aName];
-            
             return YES;
         }
     }
