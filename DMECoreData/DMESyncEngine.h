@@ -58,6 +58,7 @@ typedef void (^MessageBlock)(NSString *message, BOOL important);
 @property (assign, nonatomic) BOOL downloadFiles;
 @property (assign, nonatomic) BOOL downloadOptionalFiles;
 @property (assign, nonatomic) SyncLogLevel logLevel;
+@property (strong, nonatomic) NSSet *acceptableContentTypes;
 
 +(instancetype)sharedEngine;
 

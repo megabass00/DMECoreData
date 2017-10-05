@@ -78,6 +78,7 @@ typedef void (^DownloadCompletionBlock)();
         sharedEngine.logLevel = SyncLogLevelVerbose;
         sharedEngine.syncBlocked = NO;
         sharedEngine.autoSyncActive = NO;
+        sharedEngine.acceptableContentTypes = [NSSet setWithObjects:@"application/pdf", @"application/x-bzpdf", @"application/x-gzpdf", @"image/jpeg", @"image/png", @"image/tiff", @"image/tiff-fx", @"video/mp4", @"video/quicktime", nil];
     });
     
     return sharedEngine;
@@ -2278,7 +2279,7 @@ typedef void (^DownloadCompletionBlock)();
             //Creamos la operacion de descarga
             AFHTTPRequestOperation *op = [[AFHTTPRequestOperation alloc] initWithRequest:[NSURLRequest requestWithURL:url]];
             op.outputStream = [NSOutputStream outputStreamToFileAtPath:urlLocal append:NO];
-            op.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/pdf", @"application/x-bzpdf", @"application/x-gzpdf", @"image/jpeg", @"image/png", @"image/tiff", @"image/tiff-fx", @"video/mp4", @"video/quicktime", nil];
+            op.responseSerializer.acceptableContentTypes = _acceptableContentTypes;
             op.queuePriority = NSOperationQueuePriorityHigh;
             
             [op setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead){}];
