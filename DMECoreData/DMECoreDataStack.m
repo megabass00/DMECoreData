@@ -31,7 +31,9 @@ static DMECoreDataStack *sharedInstance = nil;
         return sharedInstance;
     }
     else{
-        NSLog(@"Debes inicializar el CoreDataStack antes de usarlo");
+        NSAssert(NO, @"Debes inicializar el CoreDataStack antes de usarlo");
+        
+        return nil;
     }
 }
 
@@ -57,7 +59,7 @@ static DMECoreDataStack *sharedInstance = nil;
         return sharedInstance;
     }
     else{
-        NSLog(@"El CoreDataStack ya ha sido inicializado con anterioridad");
+        NSAssert(NO, @"El CoreDataStack ya ha sido inicializado con anterioridad");
         
         return nil;
     }
@@ -80,7 +82,7 @@ static DMECoreDataStack *sharedInstance = nil;
         return sharedInstance;
     }
     else{
-        NSLog(@"El CoreDataStack ya ha sido inicializado con anterioridad");
+        NSAssert(NO, @"El CoreDataStack ya ha sido inicializado con anterioridad");
         
         return nil;
     }

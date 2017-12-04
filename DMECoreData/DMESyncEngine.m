@@ -249,9 +249,8 @@ typedef void (^DownloadCompletionBlock)();
                     steps = 2;
                 }
                 
-                if(self.downloadFiles){
-                    steps += 1;
-                }
+                //Descarga de ficheros
+                steps += 1;
                 
                 [self progressBlockTotal:steps inMainProcess:YES];
                 
