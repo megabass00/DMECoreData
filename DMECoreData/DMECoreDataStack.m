@@ -32,6 +32,8 @@ static DMECoreDataStack *sharedInstance = nil;
     }
     else{
         NSLog(@"Debes inicializar el CoreDataStack antes de usarlo");
+        
+        return nil;
     }
 }
 
