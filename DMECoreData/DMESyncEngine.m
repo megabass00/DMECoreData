@@ -2217,10 +2217,16 @@ typedef void (^DownloadCompletionBlock)();
                                 NSArray *objects = [self managedObjectsForClass:className];
                                 for (NSManagedObject *object in objects) {
                                     @autoreleasepool {
-                                        if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""] && ![self fileExistWithName:[object valueForKey:property.name] ofClass:className] && ![filesToDownloadURLs containsObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]]){
-                                            //Añadimos la url para ser descargada
-                                            [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
-                                            [filesToDownloadURLs addObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]];
+                                        if([object valueForKey:property.name] && ![(NSString *)[object valueForKey:property.name] isEqualToString:@""]){
+                                            
+                                            // Multimedia
+                                            if(![self fileExistWithName:[object valueForKey:property.name] ofClass:className] && ![filesToDownloadURLs containsObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]]){
+                                                //Añadimos la url para ser descargada
+                                                [self.filesToDownload addObject:[NSDictionary dictionaryWithObjectsAndKeys:className, @"classname", [object valueForKey:property.name], @"url", nil]];
+                                                [filesToDownloadURLs addObject:[[className stringByAppendingString:@"/"] stringByAppendingString:[object valueForKey:property.name]]];
+                                            } else { //Thumbnails
+                                                [self thumbnailFileWithName:[object valueForKey:property.name] ofClass:className];
+                                            }
                                         }
                                     }
                                 }
@@ -2294,7 +2300,7 @@ typedef void (^DownloadCompletionBlock)();
                 NSError *error;
                 if(![operation.responseSerializer validateResponse:operation.response data:operation.responseData error:&error] || error){
                     error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
-                                       andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
+                                       andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero (%@/%@): %@/%@", nil), @(self.downloadedFiles), @(self.filesToDownload.count), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
                                      andFailureReason:NSLocalizedString(@"Ha fallado la descarga del fichero", nil)
                                 andRecoverySuggestion:NSLocalizedString(@"Compruebe los ficheros", nil)];
                     
@@ -2305,7 +2311,7 @@ typedef void (^DownloadCompletionBlock)();
                 else{
                     [self thumbnailFileWithName:[file objectForKey:@"url"] ofClass:[file objectForKey:@"classname"]];
                     
-                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), [NSNumber numberWithInteger:self.downloadedFiles], [NSNumber numberWithInteger:self.filesToDownload.count], [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
+                    [self messageBlock:[NSString stringWithFormat:NSLocalizedString(@"Descargado fichero (%@/%@): %@/%@", nil), @(self.downloadedFiles), @(self.filesToDownload.count), [file objectForKey:@"classname"], [file objectForKey:@"url"]] important:NO];
                 }
                 
                 responseObject = nil;
@@ -2316,7 +2322,7 @@ typedef void (^DownloadCompletionBlock)();
                 [self progressBlockIncrementInMainProcess:NO];
 
                 error = [self createErrorWithCode:SyncErrorCodeDeleteInfo
-                                   andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero: %@/%@", nil), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
+                                   andDescription:[NSString stringWithFormat:NSLocalizedString(@"No se ha podido descargar el fichero (%@/%@): %@/%@", nil), @(self.downloadedFiles), @(self.filesToDownload.count), [file objectForKey:@"classname"], [file objectForKey:@"url"]]
                                  andFailureReason:NSLocalizedString(@"Ha fallado la descarga del fichero", nil)
                             andRecoverySuggestion:NSLocalizedString(@"Compruebe los ficheros", nil)];
                 
@@ -2360,34 +2366,37 @@ typedef void (^DownloadCompletionBlock)();
     NSString *className = [NSString stringWithFormat:@"%@%@", [[aClass substringToIndex:1] lowercaseString], [aClass substringFromIndex:1]];
     NSString *urlDirectorio = [NSString stringWithFormat:@"%@/%@", pathCache(), className];
     NSString *urlLocal = [NSString stringWithFormat:@"%@/%@", urlDirectorio, aName];
-    
-    NSString *file = urlLocal;
-    CFStringRef fileExtension = (__bridge CFStringRef) [file pathExtension];
-    CFStringRef fileUTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, fileExtension, NULL);
-    
-    if (UTTypeConformsTo(fileUTI, kUTTypeImage)){
-        [[DMEThumbnailer sharedInstance] generateImageThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
+
+    if(![[DMEThumbnailer sharedInstance] thumbExistForPath:urlLocal]) {
+        NSString *file = urlLocal;
+        CFStringRef fileExtension = (__bridge CFStringRef) [file pathExtension];
+        CFStringRef fileUTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, fileExtension, NULL);
+        
+        if (UTTypeConformsTo(fileUTI, kUTTypeImage)){
+            [[DMEThumbnailer sharedInstance] generateImageThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
+        }
+        else if (UTTypeConformsTo(fileUTI, kUTTypeMovie)){
+            [[DMEThumbnailer sharedInstance] generateVideoThumbnails:urlLocal afterGenerate:^(UIImage **thumb) {
+                //Overlay play
+                UIImage *backgroundImage = *thumb;
+                UIImage *watermarkImage = [UIImage imageNamed:@"VideoWatermark"];
+                CGSize watermarkSize = watermarkImage.size;
+                watermarkSize = [[DMEThumbnailer sharedInstance] adjustSizeRetina:watermarkSize];
+                UIGraphicsBeginImageContext(backgroundImage.size);
+                [backgroundImage drawInRect:CGRectMake(0, 0, backgroundImage.size.width, backgroundImage.size.height)];
+                [watermarkImage drawInRect:CGRectMake((backgroundImage.size.width - watermarkSize.width) / 2, (backgroundImage.size.height - watermarkSize.height) / 2, watermarkSize.width, watermarkSize.height)];
+                *thumb = UIGraphicsGetImageFromCurrentImageContext();
+                UIGraphicsEndImageContext();
+            } completionBlock:nil];
+        }
+        else if (UTTypeConformsTo(fileUTI, kUTTypePDF)){
+            [[DMEThumbnailer sharedInstance] generatePDFThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
+        }
+        
+        CFRelease(fileUTI);
+        file = nil;
     }
-    else if (UTTypeConformsTo(fileUTI, kUTTypeMovie)){
-        [[DMEThumbnailer sharedInstance] generateVideoThumbnails:urlLocal afterGenerate:^(UIImage **thumb) {
-            //Overlay play
-            UIImage *backgroundImage = *thumb;
-            UIImage *watermarkImage = [UIImage imageNamed:@"VideoWatermark"];
-            CGSize watermarkSize = watermarkImage.size;
-            watermarkSize = [[DMEThumbnailer sharedInstance] adjustSizeRetina:watermarkSize];
-            UIGraphicsBeginImageContext(backgroundImage.size);
-            [backgroundImage drawInRect:CGRectMake(0, 0, backgroundImage.size.width, backgroundImage.size.height)];
-            [watermarkImage drawInRect:CGRectMake((backgroundImage.size.width - watermarkSize.width) / 2, (backgroundImage.size.height - watermarkSize.height) / 2, watermarkSize.width, watermarkSize.height)];
-            *thumb = UIGraphicsGetImageFromCurrentImageContext();
-            UIGraphicsEndImageContext();
-        } completionBlock:nil];
-    }
-    else if (UTTypeConformsTo(fileUTI, kUTTypePDF)){
-        [[DMEThumbnailer sharedInstance] generatePDFThumbnails:urlLocal afterGenerate:nil completionBlock:nil];
-    }
-    
-    CFRelease(fileUTI);
-    file = nil;
+
     urlLocal = nil;
     urlDirectorio = nil;
     className = nil;
